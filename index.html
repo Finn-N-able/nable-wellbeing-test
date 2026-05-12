@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#6B2D8B">
+<title>N-Able UK — Recovery Companion</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💜</text></svg>">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+<script>
+window.storage = {
+  get: function(key) {
+    return new Promise(function(resolve, reject) {
+      try {
+        var val = localStorage.getItem(key);
+        resolve(val ? { key: key, value: val, shared: false } : null);
+      } catch(e) { reject(e); }
+    });
+  },
+  set: function(key, value) {
+    return new Promise(function(resolve, reject) {
+      try {
+        localStorage.setItem(key, value);
+        resolve({ key: key, value: value, shared: false });
+      } catch(e) { reject(e); }
+    });
+  },
+  delete: function(key) {
+    return new Promise(function(resolve, reject) {
+      try {
+        localStorage.removeItem(key);
+        resolve({ key: key, deleted: true, shared: false });
+      } catch(e) { reject(e); }
+    });
+  },
+  list: function(prefix) {
+    return new Promise(function(resolve) {
+      var keys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!prefix || k.indexOf(prefix) === 0) keys.push(k);
+      }
+      resolve({ keys: keys });
+    });
+  }
+};
+
+var useState = React.useState;
+var useRef = React.useRef;
+var useEffect = React.useEffect;
+var useCallback = React.useCallback;
+var useMemo = React.useMemo;
+</script>
+
+<script type="text/babel">
+
+
+const C={p:"#6B2D8B",pl:"#9B59B6",pp:"#F3E8FA",g:"#4CAF50",a:"#FF9800",r:"#E53935",bg:"#F8F6F4",tx:"#333",tl:"#666",w:"#FFF",rl:"#FFEBEE",al:"#FFF3E0"};
+const SC={red:C.r,amber:C.a,green:C.g,none:"#D1D5DB"};
+function sCol(v){return v<=3?C.r:v<=5?C.a:v<=7?"#FFB74D":C.g;}
+function genUID(){return"NA-"+Math.random().toString(36).substring(2,7).toUpperCase();}
+function todayKey(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
+function calcWeekFromDate(sd){if(!sd)return null;var d=new Date(sd);if(isNaN(d.getTime()))return null;var diff=new Date().getTime()-d.getTime();if(diff<0)return 0;return Math.min(12,Math.max(1,Math.ceil(diff/(7*24*60*60*1000))));}
+function getBodyMapAlerts(bm,surgType,side){var surgZone=surgType&&side?(surgType==="THR"?(side==="Left"?"lh":"rh"):(side==="Left"?"lk":"rk")):null;var alerts=[];var lb={};WELLBEING_ZONES.forEach(function(z){lb[z.id]=z.lb;});var surgY=surgType==="THR"?54:72;var surgX=side==="Left"?43:57;lb[surgZone]="Your Operated Area";Object.entries(bm).forEach(function(e){var zid=e[0],zd=e[1];if(zid===surgZone)return;if(zd.status==="red")alerts.push({zone:lb[zid]||zid,status:"red",note:zd.note||"",msg:"You're struggling with "+(lb[zid]||zid)+" \u2014 consider talking to someone about how you're feeling."});else if(zd.status==="amber")alerts.push({zone:lb[zid]||zid,status:"amber",note:zd.note||"",msg:(lb[zid]||zid)+" \u2014 you're noticing something here. Keep checking in with yourself."});});return alerts;}
+
+
+
+const ADL_CATS={"Meal Prep":{ic:"\u{1F373}",items:["Planning meals","Preparing cold food","Cooking a hot meal","Using kitchen appliances","Washing up","Carrying food and drinks"]},
+"Personal Care":{ic:"\u{1F9F4}",items:["Washing face and hands","Showering or bathing","Dressing upper body","Dressing lower body","Socks and shoes","Grooming","Toileting"]},
+"Laundry":{ic:"\u{1F455}",items:["Loading washing machine","Hanging clothes","Ironing","Putting clothes away"]},
+"Medication":{ic:"\u{1F48A}",items:["Remembering medication","Opening packaging","Managing schedule"]},
+"Shopping":{ic:"\u{1F6D2}",items:["Writing a list","Getting to shops","Carrying shopping","Unpacking","Online shopping"]},
+"Finances":{ic:"\u{1F4B7}",items:["Paying bills","Managing bank account","Weekly budgeting"]},
+"Community":{ic:"\u{1F30D}",items:["Walking outdoors","Public transport","Getting in and out of car","Attending appointments","Socialising","Groups and activities"]}};
+
+
+const WELLBEING_ZONES=[
+  {id:"head",lb:"Head & Mind",x:50,y:8,prompt:"Overthinking, worry, racing thoughts, poor concentration"},
+  {id:"chest",lb:"Chest & Heart",x:50,y:25,prompt:"Anxiety, grief, feeling overwhelmed, panic"},
+  {id:"shoulders",lb:"Shoulders & Neck",x:50,y:15,prompt:"Tension, burden, feeling the weight of it all"},
+  {id:"stomach",lb:"Stomach & Gut",x:50,y:40,prompt:"Stress, nervousness, dread, loss of appetite"},
+  {id:"lowb",lb:"Lower Back & Body",x:50,y:48,prompt:"Exhaustion, fatigue, feeling unsupported"},
+];
+
+const CONDITIONS=[
+  {id:"c_hipknee",l:"Hip or Knee Replacement",ic:"\u{1F9B4}",desc:"I've had or am preparing for hip or knee surgery"},
+  {id:"c_arthritis",l:"Arthritis",ic:"\u{1F9B5}",desc:"I manage arthritis alongside my recovery"},
+  {id:"c_mental",l:"Anxiety or Low Mood",ic:"\u{1F9E0}",desc:"My mental health is affected by my recovery"},
+  {id:"c_pain",l:"Chronic Pain",ic:"\u{1F48A}",desc:"I live with ongoing pain beyond my surgery"},
+  {id:"c_mobility",l:"General Mobility Issues",ic:"\u{1F6B6}",desc:"I have difficulty getting around"}
+];
+/* Future conditions (to be reinstated): c3 Early On-set Dementia/Alzheimer's, c4 Neurological (Stroke, Parkinsons, MS) */
+const ROOMS=["Kitchen","Bathroom","Bedroom","Living Room","Hallway / Stairs","Garden"];
+var GOAL_TEXT={"Meal Prep":"Build independence with meal prep","Personal Care":"Feel more confident with personal care","Laundry":"Get on top of laundry","Medication":"Stay on top of medication","Shopping":"Feel more confident with shopping","Finances":"Build confidence managing finances","Community":"Get out and about more"};
+const RES=[{id:"r3",t:"Managing discomfort",c:"Wellbeing",d:"Tips for managing discomfort day to day.",i:"\u{1F48A}"},{id:"r4",t:"Driving again",c:"Milestones",d:"Guidelines for returning to driving.",i:"\u{1F697}"},{id:"r5",t:"Sleep tips",c:"Wellbeing",d:"Comfortable positions during recovery.",i:"\u{1F634}"},{id:"r7",t:"Reablement journey",c:"Recovery",d:"Focusing on potential, not limitations.",i:"\u{1F331}"},{id:"r8",t:"Continued recovery",c:"Signposting",d:"Resources and next steps after your recovery.",i:"\u{1F5FA}\uFE0F"}];
+
+/* ═══════════════════════════════════════════════════════════════════
+   makePersonalisedPlan — FULLY LOCAL, NO API CALLS
+   Builds a personalised reablement support plan using ALL patient data:
+   surgType, weekNum, maxWeeks, side, painLevel, assessments,
+   outcomes, conditions, equipAids (room scans), bodyMap
+   ═══════════════════════════════════════════════════════════════════ */
+function makePersonalisedPlan(surgType, weekNum, maxWeeks, side, painLevel, assessments, outcomes, conditions, equipAids, bodyMap, uploadedDocs, achieved) {
+  var j = surgType === "THR" ? "hip" : "knee";
+  var jFull = surgType === "THR" ? "Total Hip Replacement" : "Total Knee Replacement";
+  var sideStr = side || "unspecified";
+
+  /* ── Pull assessment data if available ── */
+  var fa = assessments && assessments.first ? assessments.first : null;
+  var midA = assessments && assessments.mid ? assessments.mid : null;
+  var latestA = midA || fa;
+  var pAvg = latestA ? latestA.pAvg : 0;
+  var mAvg = latestA ? latestA.mAvg : 0;
+  var oAdl = latestA ? latestA.oAdl : 0;
+  var catAvg = latestA && latestA.catAvg ? latestA.catAvg : {};
+  var hasMid = !!midA;
+
+  /* ── Derive condition names ── */
+  var condNames = (conditions || []).map(function(id) {
+    var found = CONDITIONS.find(function(c) { return c.id === id; });
+    return found ? found.l : "";
+  }).filter(Boolean);
+  var hasArthritis = condNames.some(function(n) { return n.indexOf("Arthritis") >= 0; });
+  var hasNeuro = condNames.some(function(n) { return n.indexOf("Neurological") >= 0; });
+  var hasDementia = condNames.some(function(n) { return n.indexOf("Dementia") >= 0 || n.indexOf("Alzheimer") >= 0; });
+
+  /* ── Derive body map pain zones ── */
+  var bm = bodyMap || {};
+  var redZones = [];
+  var amberZones = [];
+  WELLBEING_ZONES.forEach(function(z) {
+    if (bm[z.id]) {
+      if (bm[z.id].status === "red") redZones.push(z.lb);
+      if (bm[z.id].status === "amber") amberZones.push(z.lb);
+    }
+  });
+
+  /* ── Derive room scan equipment ── */
+  var scannedRooms = (equipAids || []).map(function(e) { return e.room; });
+  var essentialMissing = [];
+  var recommendedMissing = [];
+  var optionalMissing = [];
+  var safetyIssues = [];
+  var roomSummaries = [];
+  (equipAids || []).forEach(function(e) {
+    if (e.results && e.results.suggestions) {
+      var roomEss = 0, roomRec = 0;
+      e.results.suggestions.forEach(function(s) {
+        var item = s.name + (s.note ? " — " + s.note : "");
+        if (s.priority === "Essential") { essentialMissing.push(item + " (" + e.room + ")"); roomEss++; }
+        else if (s.priority === "Recommended") { recommendedMissing.push(item + " (" + e.room + ")"); roomRec++; }
+        else { optionalMissing.push(item + " (" + e.room + ")"); }
+        if (s.category === "Safety") { safetyIssues.push(item + " (" + e.room + ")"); }
+      });
+      var total = 0;
+      var checks = ROOM_CHECKS[e.room];
+      if (checks) total = checks.items.length;
+      var okN = total - (roomEss + roomRec + (e.results.suggestions.length - roomEss - roomRec));
+      roomSummaries.push({ room: e.room, essential: roomEss, recommended: roomRec, ok: Math.max(0, okN), total: total });
+    }
+  });
+
+  /* ── Derive weak ADL categories ── */
+  var weakAdls = [];
+  var strongAdls = [];
+  Object.entries(catAvg).forEach(function(entry) {
+    var cat = entry[0];
+    var val = parseFloat(entry[1]);
+    if (val > 0 && val <= 5) weakAdls.push(cat);
+    else if (val > 7) strongAdls.push(cat);
+  });
+
+  /* ── Derive outcome categories in play ── */
+  var outCats = {};
+  (outcomes || []).forEach(function(o) {
+    outCats[o.cat] = true;
+  });
+
+  /* ── Intensity classification based on ADL scores ── */
+  var overallLevel = "moderate";
+  if (oAdl > 0) {
+    if (oAdl <= 3.5) overallLevel = "low";
+    else if (oAdl >= 7) overallLevel = "high";
+  }
+
+  var highPain = painLevel >= 7;
+  var earlyWeeks = weekNum <= 2;
+  var midWeeks = weekNum >= 3 && weekNum <= 5;
+  var lateWeeks = weekNum >= 6;
+
+  /* ═══ BUILD SUMMARY ═══ */
+  var summaryParts = [];
+  summaryParts.push("Personalised " + maxWeeks + "-week recovery guide for " + sideStr.toLowerCase() + " " + jFull + " recovery.");
+  if (latestA) {
+    summaryParts.push("Based on your daily living self-reflection: overall " + oAdl.toFixed(1) + "/10.");
+  } else {
+    summaryParts.push("Focuses on regaining independence in your daily life, step by step.");
+  }
+  if (condNames.length > 0) {
+    summaryParts.push("Adapted for: " + condNames.join(", ") + ".");
+  }
+  var summary = summaryParts.join(" ");
+
+  /* ═══ BUILD GOALS — 1:1 from outcomes ═══ */
+  var goals = [];
+  var achievedIds=achieved||{};
+  (outcomes || []).forEach(function(o) {
+    var isAchieved=achievedIds[o.id]==="achieved";
+    var isWorking=achievedIds[o.id]==="working";
+    var cat=o.cat==="Custom"?"Personal Goal":o.cat;
+    var label=cat.replace("ADL: ","");
+    goals.push({label:label||"Goal",detail:o.text,achieved:isAchieved,working:isWorking,status:achievedIds[o.id]||"not_started"});
+  });
+  if (goals.length < 1) goals.push({label:"Daily Independence",detail:"Personal care and daily tasks without assistance",status:"not_started"});
+
+  /* ═══ BUILD EQUIPMENT LIST — with links ═══ */
+  var EQUIP_LINKS={
+    "walking frame":{url:"https://www.nhs.uk/conditions/social-care-and-support-guide/care-services-equipment-and-care-homes/walking-aids-wheelchairs-and-mobility-scooters/",src:"NHS (prescribed)"},
+    "crutches":{url:"https://www.nhs.uk/conditions/social-care-and-support-guide/care-services-equipment-and-care-homes/walking-aids-wheelchairs-and-mobility-scooters/",src:"NHS (prescribed)"},
+    "hip kit":{url:"https://www.completecareshop.co.uk/hip-kits",src:"Buy online"},
+    "raised toilet seat":{url:"https://www.amazon.co.uk/s?k=raised+toilet+seat",src:"Buy online"},
+    "long-handled reacher":{url:"https://www.amazon.co.uk/s?k=long+handled+reacher+grabber",src:"Buy online"},
+    "reacher":{url:"https://www.amazon.co.uk/s?k=long+handled+reacher+grabber",src:"Buy online"},
+    "shoe horn":{url:"https://www.amazon.co.uk/s?k=long+handled+shoe+horn",src:"Buy online"},
+    "sock aid":{url:"https://www.amazon.co.uk/s?k=sock+aid+helper",src:"Buy online"},
+    "perching stool":{url:"https://www.amazon.co.uk/s?k=perching+stool+kitchen",src:"Buy online"},
+    "cushion or wedge":{url:"https://www.amazon.co.uk/s?k=hip+replacement+wedge+cushion",src:"Buy online"},
+    "ice pack":{url:"https://www.amazon.co.uk/s?k=gel+ice+pack+reusable+knee",src:"Buy online"},
+    "compression bandage":{url:"https://www.amazon.co.uk/s?k=compression+bandage+knee",src:"Buy online"},
+    "gel ice pack":{url:"https://www.amazon.co.uk/s?k=gel+ice+pack+reusable",src:"Buy online"},
+    "jar opener":{url:"https://www.amazon.co.uk/s?k=ergonomic+jar+opener+arthritis",src:"Buy online"},
+    "thick-grip cutlery":{url:"https://www.amazon.co.uk/s?k=thick+grip+cutlery+arthritis",src:"Buy online"},
+    "non-slip mat":{url:"https://www.amazon.co.uk/s?k=non+slip+mat+bathroom",src:"Buy online"},
+    "non-slip bath mat":{url:"https://www.amazon.co.uk/s?k=non+slip+bath+mat",src:"Buy online"},
+    "grab rail":{url:"https://www.amazon.co.uk/s?k=grab+rails+bathroom",src:"Buy online"},
+    "dosette box":{url:"https://www.amazon.co.uk/s?k=dosette+box+weekly",src:"Buy online"},
+    "medication dosette":{url:"https://www.amazon.co.uk/s?k=dosette+box+weekly",src:"Buy online"},
+    "shower stool":{url:"https://www.amazon.co.uk/s?k=shower+stool+elderly",src:"Buy online"},
+    "shower seat":{url:"https://www.amazon.co.uk/s?k=shower+seat+wall+mounted",src:"Buy online"},
+    "bath board":{url:"https://www.amazon.co.uk/s?k=bath+board+transfer",src:"Buy online"},
+    "long-handled sponge":{url:"https://www.amazon.co.uk/s?k=long+handled+sponge+bathing",src:"Buy online"},
+    "wash aid":{url:"https://www.amazon.co.uk/s?k=long+handled+wash+aid",src:"Buy online"},
+    "trolley":{url:"https://www.amazon.co.uk/s?k=kitchen+trolley+wheels",src:"Buy online"},
+    "kettle tipper":{url:"https://www.amazon.co.uk/s?k=kettle+tipper+disability",src:"Buy online"},
+    "lightweight kettle":{url:"https://www.amazon.co.uk/s?k=lightweight+kettle+one+cup",src:"Buy online"},
+    "contrast strips":{url:"https://www.amazon.co.uk/s?k=stair+contrast+strips",src:"Buy online"},
+    "stair edges":{url:"https://www.amazon.co.uk/s?k=stair+contrast+strips+anti+slip",src:"Buy online"},
+    "key safe":{url:"https://www.amazon.co.uk/s?k=key+safe+outdoor",src:"Buy online"},
+    "handrail":{url:"https://www.amazon.co.uk/s?k=stair+handrail+wall+mounted",src:"Buy online"},
+    "bannister":{url:"https://www.amazon.co.uk/s?k=stair+handrail+wall+mounted",src:"Buy online"},
+    "bed rail":{url:"https://www.amazon.co.uk/s?k=bed+rail+elderly",src:"Buy online"},
+    "bedside light":{url:"https://www.amazon.co.uk/s?k=bedside+lamp+touch",src:"Buy online"},
+    "pan handle":{url:"https://www.amazon.co.uk/s?k=pan+handle+holder+disability",src:"Buy online"},
+    "easy-grip":{url:"https://www.amazon.co.uk/s?k=easy+grip+utensils+disability",src:"Buy online"},
+  };
+  var findLink=function(text){var lower=text.toLowerCase();var keys=Object.keys(EQUIP_LINKS);for(var i=0;i<keys.length;i++){if(lower.indexOf(keys[i])>=0)return EQUIP_LINKS[keys[i]];}return null;};
+  var equipCore=[];var equipRooms=[];var equipDocs=[];var equipCondition=[];
+  var mkEq=function(name,linkOverride){var lk=linkOverride||findLink(name);return{name:name,link:lk?lk.url:null,src:lk?lk.src:null};};
+  if(surgType){
+    equipCore.push(mkEq("Walking frame or crutches (if recommended)"));
+    if(surgType==="THR"){equipCore.push(mkEq("Hip kit: raised toilet seat, long-handled reacher, shoe horn, sock aid"));equipCore.push(mkEq("Perching stool for kitchen and bathroom"));equipCore.push(mkEq("Cushion or wedge to maintain comfortable seated position"));}
+    else{equipCore.push(mkEq("Raised toilet seat if needed for early weeks"));equipCore.push(mkEq("Perching stool for kitchen tasks"));equipCore.push(mkEq("Ice pack and compression bandage for swelling management"));}
+  }
+  essentialMissing.forEach(function(s){equipRooms.push({name:s,pri:"Essential",link:(findLink(s)||{}).url||null,src:(findLink(s)||{}).src||null});});
+  recommendedMissing.forEach(function(s){equipRooms.push({name:s,pri:"Recommended",link:(findLink(s)||{}).url||null,src:(findLink(s)||{}).src||null});});
+  var optShown=0;optionalMissing.forEach(function(s){if(optShown<3){equipRooms.push({name:s,pri:"Optional",link:(findLink(s)||{}).url||null,src:(findLink(s)||{}).src||null});optShown++;}});
+  (uploadedDocs||[]).forEach(function(doc){if(doc.error)return;(doc.keyPoints||[]).forEach(function(kp){if(kp.category&&(kp.category.toLowerCase().indexOf("equipment")>=0||kp.category.toLowerCase().indexOf("aid")>=0||kp.category.toLowerCase().indexOf("device")>=0))equipDocs.push(mkEq(kp.detail));});});
+  if(highPain)equipCondition.push(mkEq("Gel ice pack \u2014 apply wrapped in towel for 15 mins after activity"));
+  if(hasArthritis)equipCondition.push(mkEq("Ergonomic jar opener and thick-grip cutlery for arthritic joints"));
+  if(hasNeuro)equipCondition.push(mkEq("Non-slip bath mat and grab rails for safety with balance difficulties"));
+  if(hasDementia)equipCondition.push(mkEq("Medication dosette box with alarm to support daily routine"));
+  var equipment=equipCore.concat(equipRooms.map(function(r){return{name:(r.pri==="Essential"?"\u{1F534} ":r.pri==="Recommended"?"\u{1F7E0} ":"\u{1F7E2} ")+r.name,link:r.link,src:r.src,pri:r.pri};})).concat(equipDocs.map(function(d){return{name:"\u{1F4C4} "+d.name,link:d.link,src:d.src};})).concat(equipCondition);
+
+  /* ═══ BUILD TODAY'S SUMMARY — specific to current week + data ═══ */
+  var todayParts = [];
+  todayParts.push("Week " + weekNum + " of " + maxWeeks + ".");
+  if (weakAdls.length > 0) {
+    todayParts.push("Focus on " + weakAdls.slice(0, 2).join(" and ").toLowerCase() + " — these are areas where a little daily practice makes a big difference.");
+  } else if (earlyWeeks) {
+    todayParts.push("Focus on settling into your daily routine, getting comfortable moving around your home, and building confidence.");
+  } else if (lateWeeks) {
+    todayParts.push("Build towards greater independence in your daily routine and community activities.");
+  } else {
+    todayParts.push("Keep building your daily living confidence step by step.");
+  }
+  if (redZones.length > 0) {
+    todayParts.push("Take care with " + redZones.slice(0, 2).join(" and ") + " — you're struggling here. Consider talking to someone about how you're feeling.");
+  }
+  var todaySummary = todayParts.join(" ");
+
+  /* ═══ BUILD BODY MAP INSIGHTS (extra section) ═══ */
+  var bodyInsights = null;
+  if (redZones.length > 0 || amberZones.length > 0) {
+    bodyInsights = {
+      title: "Body Map Findings",
+      red: redZones,
+      amber: amberZones,
+      advice: redZones.length > 0
+        ? "You're struggling with: " + redZones.join(", ") + ". Consider talking to someone about how you're feeling."
+        : "You're noticing something with: " + amberZones.join(", ") + ". Keep checking in with yourself."
+    };
+  }
+
+  return {
+    summary: summary,
+    goals: goals,
+    equipment: equipment,
+    todaySummary: todaySummary,
+    bodyInsights: bodyInsights,
+    conditionNotes: condNames.length > 0 ? condNames : null,
+    scannedRooms: scannedRooms.length > 0 ? scannedRooms : null,
+    roomAssessment: roomSummaries.length > 0 ? {
+      rooms: roomSummaries,
+      essentialMissing: essentialMissing,
+      recommendedMissing: recommendedMissing,
+      safetyIssues: safetyIssues,
+      totalActions: essentialMissing.length + recommendedMissing.length + optionalMissing.length
+    } : null,
+  };
+}
+
+function genDailyTasks(outcomes,surg,week,aAdl){
+  var t=[];var j=surg==="THR"?"hip":surg==="TKR"?"knee":"joint";var early=week<=2;
+  outcomes.forEach(function(o){
+    if(o.cat==="Physical"){
+      t.push({id:"dt_ice_"+o.id,text:"Apply ice to your "+j+" for 15 minutes after activity",detail:"Wrap ice in tea towel. Place on operated "+j+". Elevate leg on cushion.",cat:"Recovery",icon:"\u{1F9CA}",period:"afternoon"});
+    }
+    if(o.cat==="Mobility"){
+      t.push({id:"dt_walk_"+o.id,text:early?"Walk to kitchen and back 3 times using your walking aid":"Walk outdoors for 10-15 minutes on flat ground",detail:early?"Focus on heel-toe pattern. Rest if tired.":"Choose flat route. Use walking aid if prescribed.",cat:"Mobility",icon:"\u{1F6B6}",period:"afternoon"});
+    }
+    if(o.cat.startsWith("ADL")){
+      var c2=o.cat.replace("ADL: ","");
+      if(c2==="Personal Care") t.push({id:"dt_dress_"+o.id,text:"Get dressed independently \u2014 operated leg first for trousers",detail:"Sit on bed edge. Operated leg first into trouser leg. Use reacher for items on floor.",cat:"ADL",icon:"\u{1F456}",period:"morning"});
+      else if(c2==="Meal Prep") t.push({id:"dt_meal_"+o.id,text:"Make a hot drink and simple meal",detail:"Use perching stool at worktop if standing tires you.",cat:"ADL",icon:"\u2615",period:"morning"});
+      else if(c2==="Medication") t.push({id:"dt_med_"+o.id,text:"Set out today's medications and take on schedule",detail:"Check each dose against your discharge letter. Set phone alarms.",cat:"ADL",icon:"\u{1F48A}",period:"morning"});
+      else if(c2==="Shopping") t.push({id:"dt_shop_"+o.id,text:early?"Write this week's shopping list":"Walk to a nearby shop for 1-2 items",detail:early?"Group items by aisle. Use delivery if needed.":"Take walking aid. Use rucksack not carrier bags.",cat:"ADL",icon:"\u{1F6D2}",period:"afternoon"});
+      else if(c2==="Laundry") t.push({id:"dt_laun_"+o.id,text:"Put a small wash load on",detail:"Place basket on table to avoid bending. Hang items at waist height.",cat:"ADL",icon:"\u{1F455}",period:"afternoon"});
+      else if(c2==="Community") t.push({id:"dt_comm_"+o.id,text:early?"Step outside for 5 minutes fresh air":"Walk to a local cafe or neighbour",detail:early?"Brief time outdoors improves mood. Stay near home.":"Plan flat route. Rest on benches.",cat:"ADL",icon:"\u{1F331}",period:"afternoon"});
+      else if(c2==="Finances") t.push({id:"dt_fin_"+o.id,text:"Check bank balance and review bills due",detail:"Use online banking. Set up direct debits where possible.",cat:"ADL",icon:"\u{1F4B7}",period:"afternoon"});
+    }
+  });
+  t.push({id:"dt_mindcheck",text:"Check in with your mind & body map",detail:"Take a moment to notice where you're holding tension or stress today.",cat:"Wellbeing",icon:"\u{1F9D8}",period:"morning"});
+  if(!t.length){
+    t.push({id:"dt_d1",text:"Ice and elevate your "+j+" for 15 minutes",detail:"Wrap ice in towel. Elevate on cushions.",cat:"Recovery",icon:"\u{1F9CA}",period:"afternoon"});
+    t.push({id:"dt_d3",text:early?"Walk around your home 3 times":"Take a 10-minute walk outdoors",detail:"Use walking aid. Focus on steady heel-toe steps.",cat:"Mobility",icon:"\u{1F6B6}",period:"afternoon"});
+  }
+  outcomes.forEach(function(o){if(o.cat==="ADL: Meal Prep"){t.push({id:"dt_evening_meal",text:"Prepare your evening meal",detail:"Use perching stool if standing tires you. Keep it simple — batch cooking saves energy.",cat:"ADL",icon:"\u{1F37D}️",period:"evening"});}});
+  t.push({id:"dt_relax",text:"Wind-down routine — relax before bed",detail:"Try gentle breathing, reading, or listening to calming music. Avoid screens for 30 minutes before sleep.",cat:"Wellbeing",icon:"\u{1F319}",period:"evening"});
+  t.push({id:"dt_review",text:"Review your day and check in",detail:"Take a moment to reflect on how today went. Log your mood and comfort level below.",cat:"Wellbeing",icon:"\u{1F31F}",period:"evening"});
+  return t;
+}
+
+/* TODO: Replace this embedded JPEG with an SVG silhouette.
+   The current image is a low-resolution JPEG that will look pixelated on
+   modern high-DPI phone screens (2x/3x). An SVG would be resolution-independent,
+   smaller in file size, and could be styled/themed with CSS. */
+var BODY_IMG="data:image/jpeg;base64,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";
+
+function BMap(props){
+  var bm=props.zones||{},onTap=props.onTap,surg=props.surg,side=props.side;
+  var bodyZones=WELLBEING_ZONES.slice();
+  // Add surgical zone dynamically
+  var surgId=surg==="THR"?(side==="Left"?"lh":"rh"):(side==="Left"?"lk":"rk");
+  var surgY=surg==="THR"?54:72;
+  var surgX=side==="Left"?43:57;
+  if(surg&&side){
+    bodyZones.push({id:surgId,lb:"Your Operated Area",x:surgX,y:surgY,prompt:"Frustration with recovery, fear of re-injury, loss of confidence"});
+  }
+
+  /* Determine surgical zone auto-mark */
+  var surgZone=(surg&&side)?surgId:null;
+
+  var ds=34;
+  return(<div style={{position:"relative",width:"100%",margin:"0 auto"}}>
+    <img src={BODY_IMG} alt="Human body outline with interactive zones for wellbeing tracking" style={{width:"100%",height:"auto",display:"block"}}/>
+    {bodyZones.map(function(z){
+      var manual=bm[z.id]?bm[z.id].status:null;
+      var isSurg=z.id===surgZone;
+      var st2=manual||(isSurg?"amber":null);
+      var col=st2==="red"?C.r:st2==="amber"?C.a:st2==="green"?C.g:null;
+      var tipText=z.lb+(st2==="red"?" — struggling":st2==="amber"?" — noticing":st2==="green"?" — feeling OK":"");return(<div key={z.id} role="button" tabIndex={0} aria-label={tipText} title={tipText} onClick={function(){if(onTap)onTap(z.id);}} onKeyDown={function(e){if((e.key==="Enter"||e.key===" ")&&onTap){e.preventDefault();onTap(z.id);}}} onMouseEnter={function(e){e.currentTarget.style.transform="scale(1.15)";}} onMouseLeave={function(e){e.currentTarget.style.transform="scale(1)";}} onFocus={function(e){e.currentTarget.style.transform="scale(1.15)";}} onBlur={function(e){e.currentTarget.style.transform="scale(1)";}} style={{position:"absolute",left:"calc("+z.x+"% - "+ds/2+"px)",top:"calc("+z.y+"% - "+ds/2+"px)",width:ds,height:ds,borderRadius:"50%",background:col||"rgba(255,255,255,.5)",border:"2.5px solid "+(col||"rgba(255,255,255,.7)"),boxShadow:col?"0 0 0 4px "+col+"35":"0 1px 4px rgba(0,0,0,.18)",cursor:"pointer",zIndex:2,transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center"}}>{isSurg&&!manual&&<span style={{fontSize:9,color:C.w,fontWeight:800}}>{"♡"}</span>}</div>);
+    })}
+    {bodyZones.map(function(z){
+      var manual=bm[z.id]?bm[z.id].status:null;
+      var isSurg=z.id===surgZone;
+      if(!manual&&!isSurg)return null;
+      var isGreen=manual==="green";
+      return(<div key={"lb_"+z.id} aria-hidden="true" style={{position:"absolute",left:z.x+"%",top:"calc("+z.y+"% + "+(ds/2+3)+"px)",transform:"translateX(-50%)",fontSize:10,fontWeight:700,color:isGreen?C.tx:C.w,textShadow:isGreen?"0 1px 2px rgba(255,255,255,.8), 0 0 4px rgba(255,255,255,.6)":"0 1px 2px rgba(0,0,0,.75), 0 0 4px rgba(0,0,0,.6)",whiteSpace:"nowrap",pointerEvents:"none",zIndex:3,letterSpacing:.2}}>{z.lb}</div>);
+    })}
+  </div>);
+}
+
+
+/* Room-specific equipment/safety checklists */
+var ROOM_CHECKS={
+"Kitchen":{ic:"\u{1F373}",items:[
+{id:"k1",q:"Perching stool available at worktop",cat:"Equipment",pri:"Essential"},
+{id:"k2",q:"Non-slip mat in front of sink",cat:"Safety",pri:"Recommended"},
+{id:"k3",q:"Frequently used items at waist height",cat:"Layout",pri:"Essential"},
+{id:"k4",q:"Kettle tipper or lightweight kettle",cat:"Equipment",pri:"Recommended"},
+{id:"k5",q:"Long-handled reacher for low/high items",cat:"Equipment",pri:"Essential"},
+{id:"k6",q:"Clear path between cooker, sink and fridge",cat:"Safety",pri:"Essential"},
+{id:"k7",q:"Pan handle turners / easy-grip utensils",cat:"Equipment",pri:"Optional"},
+{id:"k8",q:"Trolley to transport items safely",cat:"Equipment",pri:"Recommended"},
+]},
+"Bathroom":{ic:"\u{1F6C1}",items:[
+{id:"b1",q:"Grab rails fitted beside toilet",cat:"Safety",pri:"Essential"},
+{id:"b2",q:"Grab rails in shower / bath area",cat:"Safety",pri:"Essential"},
+{id:"b3",q:"Raised toilet seat in place",cat:"Equipment",pri:"Essential"},
+{id:"b4",q:"Non-slip mat inside bath / shower",cat:"Safety",pri:"Essential"},
+{id:"b5",q:"Shower stool or bath board",cat:"Equipment",pri:"Essential"},
+{id:"b6",q:"Long-handled sponge / wash aid",cat:"Equipment",pri:"Recommended"},
+{id:"b7",q:"Non-slip mat on bathroom floor",cat:"Safety",pri:"Recommended"},
+{id:"b8",q:"Toiletries within easy reach (no bending)",cat:"Layout",pri:"Recommended"},
+]},
+"Bedroom":{ic:"\u{1F6CF}\uFE0F",items:[
+{id:"d1",q:"Bed at correct height (knees at 90\u00B0 when seated)",cat:"Layout",pri:"Essential"},
+{id:"d2",q:"Firm mattress that supports getting up",cat:"Equipment",pri:"Recommended"},
+{id:"d3",q:"Clear path from bed to door (no trip hazards)",cat:"Safety",pri:"Essential"},
+{id:"d4",q:"Bedside light within easy reach",cat:"Safety",pri:"Recommended"},
+{id:"d5",q:"Clothing laid out at accessible height",cat:"Layout",pri:"Recommended"},
+{id:"d6",q:"Sock aid / shoe horn / long-handled reacher",cat:"Equipment",pri:"Essential"},
+{id:"d7",q:"Phone / alarm within reach from bed",cat:"Safety",pri:"Recommended"},
+]},
+"Living Room":{ic:"\u{1F6CB}\uFE0F",items:[
+{id:"l1",q:"Chair with firm seat and armrests to push up from",cat:"Equipment",pri:"Essential"},
+{id:"l2",q:"Chair at correct height (hips above knees)",cat:"Layout",pri:"Essential"},
+{id:"l3",q:"Remote, phone, water within arm's reach",cat:"Layout",pri:"Recommended"},
+{id:"l4",q:"No trailing cables or loose rugs (trip hazards)",cat:"Safety",pri:"Essential"},
+{id:"l5",q:"Clear walking path through room",cat:"Safety",pri:"Essential"},
+{id:"l6",q:"Cushion / wedge for seating posture",cat:"Equipment",pri:"Optional"},
+]},
+"Hallway / Stairs":{ic:"\u{1FA9C}",items:[
+{id:"h1",q:"Bannister / handrail on at least one side of stairs",cat:"Safety",pri:"Essential"},
+{id:"h2",q:"All stair edges clearly visible (contrast strips)",cat:"Safety",pri:"Recommended"},
+{id:"h3",q:"Good lighting on stairs and landing",cat:"Safety",pri:"Essential"},
+{id:"h4",q:"No loose rugs or mats in hallway",cat:"Safety",pri:"Essential"},
+{id:"h5",q:"Space for walking aid beside front door",cat:"Layout",pri:"Recommended"},
+{id:"h6",q:"Key safe or easy-open lock if needed",cat:"Safety",pri:"Optional"},
+]},
+"Garden":{ic:"\u{1F333}",items:[
+{id:"g1",q:"Level, non-slip path to garden access",cat:"Safety",pri:"Essential"},
+{id:"g2",q:"Handrail at any steps",cat:"Safety",pri:"Essential"},
+{id:"g3",q:"Stable garden chair for resting",cat:"Equipment",pri:"Recommended"},
+{id:"g4",q:"No uneven paving or trip hazards",cat:"Safety",pri:"Recommended"},
+{id:"g5",q:"Outdoor lighting for evening access",cat:"Safety",pri:"Optional"},
+]}};
+
+function Scanner(props){
+  var surg=props.surg,onDone=props.onDone;
+  var rmS=useState(null);var rm=rmS[0],setRm=rmS[1];
+  var phS=useState("pick");var ph=phS[0],setPh=phS[1];
+  var imgS=useState(null);var imgData=imgS[0],setImgData=imgS[1];
+  var imgPrevS=useState(null);var imgPrev=imgPrevS[0],setImgPrev=imgPrevS[1];
+  var imgTypeS=useState("image/jpeg");var imgType=imgTypeS[0],setImgType=imgTypeS[1];
+  var resS=useState(null);var aiResult=resS[0],setAiResult=resS[1];
+  var loadS=useState(false);var loading=loadS[0],setLoading=loadS[1];
+  var errS=useState(null);var error=errS[0],setError=errS[1];
+  var doneRoomsS=useState([]);var doneRooms=doneRoomsS[0],setDoneRooms=doneRoomsS[1];
+  var fileRef=useRef(null);
+  var j=surg==="THR"?"hip":"knee";
+  var jFull=surg==="THR"?"hip replacement":"knee replacement";
+
+  var pc=function(pr){return pr==="Essential"?C.r:pr==="Recommended"?C.a:C.g;};
+
+  var handleFile=function(e){
+    var file=e.target.files?e.target.files[0]:null;
+    if(!file)return;
+    if(file.size>4*1024*1024){setError("Photo too large \u2014 please use a lower resolution image (under 4MB)");setPh("error");e.target.value="";return;}
+    var reader=new FileReader();
+    reader.onload=function(){
+      setImgPrev(reader.result);
+      setImgData(reader.result.split(",")[1]);
+      setImgType(file.type||"image/jpeg");
+      setPh("preview");
+    };
+    reader.readAsDataURL(file);
+    e.target.value="";
+  };
+
+  var analyseRoom=function(){
+    if(!imgData||!rm)return;
+    setLoading(true);setError(null);
+    var prompt="You are an NHS Occupational Therapist conducting a home safety assessment for a patient recovering from a "+jFull+". Analyse this photo of their "+rm+" and return ONLY valid JSON (no markdown, no backticks).\n\nIdentify:\n1. Safety hazards (rugs, cables, clutter, poor lighting, wet surfaces)\n2. Missing essential equipment for post-surgical recovery\n3. Recommended aids and adaptations\n4. Positive features already in place\n\nReturn this exact JSON structure:\n{\"roomType\":\""+rm+"\",\"summary\":\"2-3 sentence overview of the room's safety and suitability\",\"hazards\":[{\"item\":\"string\",\"risk\":\"string\",\"action\":\"string\"}],\"equipmentNeeded\":[{\"name\":\"string\",\"category\":\"Safety|Equipment|Layout\",\"priority\":\"Essential|Recommended|Optional\",\"reason\":\"string\"}],\"positives\":[\"string\"],\"overallRisk\":\"Low|Medium|High\"}\n\nBe specific to what you can see. If you cannot clearly see the room, still provide general "+rm+" safety advice for "+jFull+" recovery.";
+
+    var ac=new AbortController();
+    var timeout=setTimeout(function(){ac.abort();},20000);
+    fetch("https://api.anthropic.com/v1/messages",{
+      signal:ac.signal,
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:1500,
+        messages:[{role:"user",content:[
+          {type:"image",source:{type:"base64",media_type:imgType,data:imgData}},
+          {type:"text",text:prompt}
+        ]}]
+      })
+    }).then(function(r){
+      clearTimeout(timeout);
+      if(!r.ok)return r.json().then(function(e){throw new Error(e.error?e.error.message:"HTTP "+r.status);});
+      return r.json();
+    }).then(function(d){
+      if(d.error)throw new Error(d.error.message||"API error");
+      if(!d.content||!d.content.length)throw new Error("Empty response from AI");
+      var t=d.content.map(function(b){return b.text||"";}).join("");
+      var clean=t.replace(/```json|```/g,"").trim();
+      var parsed=JSON.parse(clean);
+      setAiResult(parsed);
+      setLoading(false);
+      setPh("results");
+    }).catch(function(e2){
+      clearTimeout(timeout);
+      var msg=e2.name==="AbortError"?"Analysis timed out. Use the manual checklist below instead.":e2.message||"Analysis failed";
+      setError(msg);
+      setLoading(false);
+      setPh("error");
+    });
+  };
+
+  var saveResults=function(){
+    if(!aiResult||!rm)return;
+    var suggestions=(aiResult.equipmentNeeded||[]).map(function(eq){
+      return{name:eq.name,category:eq.category,priority:eq.priority,reason:eq.reason,note:""};
+    });
+    (aiResult.hazards||[]).forEach(function(hz){
+      suggestions.push({name:hz.item+" — "+hz.action,category:"Safety",priority:"Essential",reason:"Hazard: "+hz.risk,note:""});
+    });
+    var result={
+      roomType:rm,
+      summary:aiResult.summary||"",
+      suggestions:suggestions,
+      positives:aiResult.positives||[],
+      overallRisk:aiResult.overallRisk||"Medium",
+      hasPhoto:true
+    };
+    if(onDone)onDone(rm,result);
+    setDoneRooms(function(p){return p.indexOf(rm)===-1?[...p,rm]:p;});
+    setPh("pick");setRm(null);setAiResult(null);setImgData(null);setImgPrev(null);setImgType("image/jpeg");
+  };
+
+  var resetRoom=function(){
+    setPh("pick");setRm(null);setAiResult(null);setImgData(null);setImgPrev(null);setImgType("image/jpeg");setError(null);
+  };
+
+  /* Hidden file input */
+  var fileInput=<input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>;
+
+  /* Room picker */
+  if(ph==="pick")return(<div style={{flex:1,overflow:"auto",padding:"16px 20px"}}>
+    {fileInput}
+    <div style={{fontSize:18,fontWeight:700,marginBottom:6}}>Room Assessment</div>
+    <div style={{fontSize:13,color:C.tl,marginBottom:16,lineHeight:1.5}}>Upload a photo of each room. Our AI will analyse it for safety hazards and suggest equipment for your {j} replacement recovery.</div>
+    {ROOMS.map(function(r2){var done=doneRooms.indexOf(r2)>=0;var checks=ROOM_CHECKS[r2];return(<div key={r2} onClick={function(){setRm(r2);setPh("upload");}} style={{background:C.w,borderRadius:14,padding:"14px 18px",marginBottom:8,boxShadow:"0 2px 6px rgba(0,0,0,.06)",display:"flex",alignItems:"center",gap:12,cursor:"pointer",border:done?"2px solid "+C.g:"2px solid transparent"}}>
+      <span style={{fontSize:22}}>{checks?checks.ic:"\u{1F3E0}"}</span>
+      <div style={{flex:1}}><div style={{fontSize:15,fontWeight:600}}>{r2}</div><div style={{fontSize:11,color:C.tl}}>Upload photo for AI analysis</div></div>
+      {done?<span style={{fontSize:16,color:C.g}}>{"\u2713"}</span>:<span style={{color:"#CCC"}}>{"\u203A"}</span>}
+    </div>);})}
+    {doneRooms.length>0&&<div style={{fontSize:12,color:C.g,fontWeight:600,textAlign:"center",marginTop:8}}>{doneRooms.length+" of "+ROOMS.length+" rooms assessed"}</div>}
+  </div>);
+
+  /* Upload prompt */
+  if(ph==="upload")return(<div style={{flex:1,overflow:"auto",padding:"16px 20px"}}>
+    {fileInput}
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+      <span style={{fontSize:24}}>{(ROOM_CHECKS[rm]||{}).ic||"\u{1F3E0}"}</span>
+      <div style={{fontSize:18,fontWeight:700}}>{rm}</div>
+    </div>
+    <Cd style={{background:C.pp,textAlign:"center",padding:24}}>
+      <div style={{fontSize:40,marginBottom:12}}>{"\u{1F4F8}"}</div>
+      <div style={{fontSize:15,fontWeight:700,color:C.p,marginBottom:6}}>Upload a photo of your {rm.toLowerCase()}</div>
+      <div style={{fontSize:12,color:C.tl,lineHeight:1.6,marginBottom:16}}>Take a wide-angle photo showing as much of the room as possible. Include doorways, flooring, and key areas you use daily.</div>
+      <button onClick={function(){if(fileRef.current)fileRef.current.click();}} style={{background:C.p,color:C.w,border:"none",borderRadius:12,padding:"14px 28px",fontSize:15,fontWeight:600,cursor:"pointer"}}>Choose Photo</button>
+    </Cd>
+    <Cd style={{background:C.al,border:"1px solid "+C.a}}>
+      <div style={{fontSize:12,lineHeight:1.6}}><strong>Tips for best results:</strong> Good lighting, show the floor, capture doorways and walkways, include any existing grab rails or equipment.</div>
+    </Cd>
+    <Btn onClick={resetRoom} secondary>Back to rooms</Btn>
+  </div>);
+
+  /* Photo preview */
+  if(ph==="preview")return(<div style={{flex:1,overflow:"auto",padding:"16px 20px"}}>
+    {fileInput}
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+      <span style={{fontSize:24}}>{(ROOM_CHECKS[rm]||{}).ic||"\u{1F3E0}"}</span>
+      <div style={{fontSize:18,fontWeight:700}}>{rm}</div>
+    </div>
+    {imgPrev&&<img src={imgPrev} alt={rm} style={{width:"100%",borderRadius:14,marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,.1)"}}/>}
+    <Btn onClick={function(){setPh("analysing");setTimeout(analyseRoom,100);}}>Analyse Room</Btn>
+    <Btn onClick={function(){setImgData(null);setImgPrev(null);setPh("upload");}} secondary>Choose Different Photo</Btn>
+  </div>);
+
+  /* Analysing */
+  if(ph==="analysing"||loading)return(<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32}}>
+    <div style={{fontSize:44,marginBottom:16,animation:"spin 2s linear infinite"}}>
+      <style>{"@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}"}</style>
+      {"\u{1F50D}"}
+    </div>
+    <div style={{fontSize:16,fontWeight:700,marginBottom:6}}>Analysing your {rm&&rm.toLowerCase()}...</div>
+    <div style={{fontSize:13,color:C.tl,textAlign:"center",lineHeight:1.5,marginBottom:20}}>Our AI is checking for safety hazards, missing equipment, and suggesting improvements.</div>
+    <div onClick={function(){setLoading(false);setError("Analysis cancelled. Use the manual checklist instead.");setPh("error");}} style={{padding:"10px 20px",borderRadius:10,border:"1px solid #E8E0ED",fontSize:13,color:C.tl,cursor:"pointer"}}>Cancel — use manual checklist</div>
+  </div>);
+
+  /* Error */
+  if(ph==="error"){var checks=ROOM_CHECKS[rm];return(<div style={{flex:1,overflow:"auto",padding:"16px 20px"}}>
+    <Cd style={{background:C.rl,border:"1px solid "+C.r,textAlign:"center",padding:24}}>
+      <div style={{fontSize:36,marginBottom:12}}>{"\u26A0\uFE0F"}</div>
+      <div style={{fontSize:15,fontWeight:700,color:C.r,marginBottom:8}}>Analysis couldn't complete</div>
+      <div style={{fontSize:12,color:C.tl,lineHeight:1.5,marginBottom:4}}>{error||"Unknown error"}</div>
+    </Cd>
+    <Btn onClick={function(){setPh("preview");setError(null);}}>Try Again</Btn>
+    {checks&&<div><div style={{fontSize:15,fontWeight:700,marginTop:14,marginBottom:8}}>Manual checklist for {rm}</div><div style={{fontSize:12,color:C.tl,marginBottom:10}}>Tap items that are missing or need attention:</div>{checks.items.map(function(item){var selected=aiResult&&aiResult.equipmentNeeded&&aiResult.equipmentNeeded.some(function(eq){return eq.name===item.q;});return(<div key={item.id} onClick={function(){setAiResult(function(prev){var ar=prev||{roomType:rm,summary:"Manual assessment",hazards:[],equipmentNeeded:[],positives:[],overallRisk:"Medium"};if(selected){return{...ar,equipmentNeeded:ar.equipmentNeeded.filter(function(eq){return eq.name!==item.q;})};}return{...ar,equipmentNeeded:[...(ar.equipmentNeeded||[]),{name:item.q,category:item.cat,priority:item.pri,reason:"Self-assessed",note:""}]};});}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:selected?item.pri==="Essential"?C.rl:item.pri==="Recommended"?C.al:"#E8F5E9":C.w,borderRadius:12,marginBottom:4,borderLeft:"4px solid "+(item.pri==="Essential"?C.r:item.pri==="Recommended"?C.a:C.g),cursor:"pointer",transition:"background .2s"}}>
+        <div style={{width:22,height:22,borderRadius:6,border:"2px solid "+(selected?C.p:"#CCC"),background:selected?C.p:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{selected&&<span style={{color:C.w,fontSize:11,fontWeight:700}}>{"\u2713"}</span>}</div>
+        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{item.q}</div><div style={{fontSize:10,color:C.tl}}>{item.cat} · {item.pri}</div></div>
+      </div>);})}{aiResult&&aiResult.equipmentNeeded&&aiResult.equipmentNeeded.length>0&&<div style={{marginTop:10}}><div style={{fontSize:12,color:C.p,fontWeight:600,marginBottom:6}}>{aiResult.equipmentNeeded.length} item{aiResult.equipmentNeeded.length!==1?"s":""} flagged</div><Btn onClick={function(){setPh("results");}}>Review & Save</Btn></div>}</div>}
+    <Btn onClick={resetRoom} secondary>Back to rooms</Btn>
+  </div>);}
+
+  /* Results */
+  if(ph==="results"&&aiResult)return(<div style={{flex:1,overflow:"auto",padding:"16px 20px"}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+      <span style={{fontSize:24}}>{(ROOM_CHECKS[rm]||{}).ic||"\u{1F3E0}"}</span>
+      <div style={{flex:1}}><div style={{fontSize:18,fontWeight:700}}>{rm}</div></div>
+      <span style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,background:aiResult.overallRisk==="High"?C.rl:aiResult.overallRisk==="Low"?"#E8F5E9":C.al,color:aiResult.overallRisk==="High"?C.r:aiResult.overallRisk==="Low"?C.g:C.a}}>{aiResult.overallRisk+" Risk"}</span>
+    </div>
+
+    {imgPrev&&<img src={imgPrev} alt={rm} style={{width:"100%",borderRadius:14,marginBottom:14,boxShadow:"0 2px 8px rgba(0,0,0,.1)",maxHeight:180,objectFit:"cover"}}/>}
+
+    <Cd style={{background:C.pp}}><div style={{fontSize:13,lineHeight:1.6}}>{aiResult.summary}</div></Cd>
+
+    {/* Hazards */}
+    {aiResult.hazards&&aiResult.hazards.length>0&&<Cd style={{background:C.rl,border:"1px solid "+C.r}}>
+      <div style={{fontSize:14,fontWeight:700,color:C.r,marginBottom:8}}>{"\u26A0\uFE0F Hazards Identified"}</div>
+      {aiResult.hazards.map(function(hz,i){return(<div key={i} style={{marginBottom:8,paddingBottom:8,borderBottom:i<aiResult.hazards.length-1?"1px solid rgba(229,57,53,.15)":"none"}}>
+        <div style={{fontSize:13,fontWeight:700}}>{hz.item}</div>
+        <div style={{fontSize:11,color:C.r,marginTop:2}}>Risk: {hz.risk}</div>
+        <div style={{fontSize:12,color:C.tx,marginTop:3,fontWeight:600}}>{"\u2192 "+hz.action}</div>
+      </div>);})}
+    </Cd>}
+
+    {/* Equipment needed */}
+    {aiResult.equipmentNeeded&&aiResult.equipmentNeeded.length>0&&<div>
+      <div style={{fontSize:14,fontWeight:700,marginBottom:8}}>{"\u{1F6E0}\uFE0F Equipment & Adaptations"}</div>
+      {aiResult.equipmentNeeded.map(function(eq,i){return(<div key={i} style={{background:C.w,borderRadius:14,padding:"12px 14px",marginBottom:6,borderLeft:"4px solid "+pc(eq.priority),boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+          <span style={{fontSize:13,fontWeight:700}}>{eq.name}</span>
+          <span style={{fontSize:10,fontWeight:700,color:pc(eq.priority),background:pc(eq.priority)+"15",borderRadius:20,padding:"2px 8px"}}>{eq.priority}</span>
+        </div>
+        <div style={{fontSize:11,color:C.tl,lineHeight:1.4}}>{eq.reason}</div>
+      </div>);})}
+    </div>}
+
+    {/* Positives */}
+    {aiResult.positives&&aiResult.positives.length>0&&<Cd style={{marginTop:4}}>
+      <div style={{fontSize:14,fontWeight:700,color:C.g,marginBottom:6}}>{"\u2705 Good Features"}</div>
+      {aiResult.positives.map(function(p2,i){return(<div key={i} style={{fontSize:12,color:C.tl,padding:"2px 0",lineHeight:1.5}}>{"\u2022 "+p2}</div>);})}
+    </Cd>}
+
+    <div style={{marginTop:12}}>
+      <Btn onClick={saveResults}>Save Assessment</Btn>
+      <Btn onClick={function(){setPh("preview");setAiResult(null);}} secondary>Re-analyse</Btn>
+    </div>
+  </div>);
+
+  return null;
+}
+
+/* ─── UI COMPONENTS ─── */
+function Frame(props){return(<div style={{maxWidth:600,margin:"0 auto",background:C.bg,height:"100dvh",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",color:C.tx,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:window.innerWidth>600?"0 0 30px rgba(0,0,0,.1)":"none"}}><style>{"*:focus-visible{outline:3px solid #6B2D8B;outline-offset:2px;border-radius:4px;}"}</style>{props.children}</div>);}
+function Hdr(props){return(<header style={{background:"linear-gradient(135deg,"+C.p+","+C.pl+")",padding:"18px 20px 22px",color:C.w,flexShrink:0}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>{props.back?<button onClick={props.back} aria-label="Go back" style={{cursor:"pointer",fontSize:22,padding:"2px 6px",background:"none",border:"none",color:C.w}}>{"\u2190"}</button>:<span style={{width:36}}/>}<span style={{fontSize:11,fontWeight:500,opacity:.8}}>N-ABLE UK</span>{props.right||<span style={{width:36}}/>}</div><h1 style={{fontSize:20,fontWeight:700,marginTop:10,margin:"10px 0 0"}}>{props.title}</h1>{props.sub&&<div style={{fontSize:13,opacity:.8,marginTop:3}}>{props.sub}</div>}</header>);}
+function Nav(props){var coachName=props.coachName||"Sarah";var moreIds=["docs","help","more"];var isMore=moreIds.indexOf(props.active)>=0;return(<nav aria-label="Main navigation" style={{background:C.w,borderTop:"1px solid #E8E0ED",display:"flex",justifyContent:"space-around",padding:"8px 0 18px",flexShrink:0}}>{[{id:"home",ic:"\u{1F3E0}",lb:"Home"},{id:"goals",ic:"\u{1F3AF}",lb:"My Day"},{id:"coach",ic:"\u{1F4AC}",lb:coachName.length>8?coachName.substring(0,7)+"\u2026":coachName},{id:"equip",ic:"\u{1FA91}",lb:"My Tools"},{id:"more",ic:"\u2022\u2022\u2022",lb:"More"}].map(function(t){var active=t.id==="more"?isMore:props.active===t.id;return(<div key={t.id} role="button" tabIndex={0} aria-label={t.lb} aria-current={active?"page":undefined} onClick={function(){props.onNav(t.id);}} onKeyDown={function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();props.onNav(t.id);}}} style={{textAlign:"center",cursor:"pointer",opacity:active?1:.45,padding:"2px 6px"}}><div aria-hidden="true" style={{fontSize:13}}>{t.ic}</div><div style={{fontSize:11,fontWeight:600,color:active?C.p:C.tl,marginTop:2}}>{t.lb}</div></div>);})}</nav>);}
+function Cd(props){return(<div onClick={props.onClick} style={{background:C.w,borderRadius:16,padding:18,marginBottom:10,boxShadow:"0 2px 6px rgba(0,0,0,.06)",cursor:props.onClick?"pointer":"default",...props.style}}>{props.children}</div>);}
+function PB(props){return(<div style={{background:"#E8E0ED",borderRadius:8,height:7,overflow:"hidden",marginTop:6}}><div style={{background:props.c||C.p,height:"100%",width:Math.min((props.v/(props.mx||1))*100,100)+"%",borderRadius:8,transition:"width .4s"}}/></div>);}
+function Inp(props){return(<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:600,marginBottom:5}}>{props.label}{props.req&&<span style={{color:C.r}}> *</span>}</div><input type={props.type||"text"} value={props.value} onChange={function(e){props.onChange(e.target.value);}} placeholder={props.placeholder||props.label} onClick={function(e){e.stopPropagation();}} style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"2px solid #E8E0ED",fontSize:14,outline:"none",boxSizing:"border-box"}}/></div>);}
+function Btn(props){return(<button onClick={props.onClick} disabled={props.disabled} style={{width:"100%",background:props.disabled?"#CCC":props.secondary?"transparent":C.p,color:props.disabled?"#999":props.secondary?C.p:C.w,border:props.secondary?"2px solid "+C.p:"none",borderRadius:12,padding:14,fontSize:16,fontWeight:600,cursor:props.disabled?"not-allowed":"pointer",marginBottom:8}}>{props.children}</button>);}
+function Score10(props){return(<div><div style={{display:"flex",justifyContent:"space-between",gap:2}}>{[0,1,2,3,4,5,6,7,8,9,10].map(function(n){var col=sCol(n);return(<div key={n} onClick={function(e){e.stopPropagation();props.onChange(n);}} style={{flex:1,height:36,borderRadius:7,background:props.value===n?col:"#F0F0F0",color:props.value===n?C.w:C.tx,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,cursor:"pointer"}}>{n}</div>);})}</div><div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:10,color:C.r,fontWeight:600}}>0 Cannot do</span><span style={{fontSize:10,color:C.g,fontWeight:600}}>10 Fully independent</span></div>{props.prev!==undefined&&<div style={{fontSize:10,color:"#1565C0",marginTop:4,fontWeight:600}}>Previous: {props.prev}/10</div>}</div>);}
+
+/* ═══════════ MAIN APP ═══════════ */
+function App(){
+  var scrS=useState("welcome");var scr=scrS[0],setScr=scrS[1];
+  var modeS=useState("self");var appMode=modeS[0],setAppMode=modeS[1];
+  var nameS=useState("");var name=nameS[0],setName=nameS[1];
+  var surnS=useState("");var surname=surnS[0],setSurname=surnS[1];
+  var emailS=useState("");var email=emailS[0],setEmail=emailS[1];
+  var pwS=useState("");var pw=pwS[0],setPw=pwS[1];
+  var pvS=useState(false);var pwVisible=pvS[0],setPwVisible=pvS[1];
+  var dobS=useState("");var dob=dobS[0],setDob=dobS[1];
+  var genS=useState("");var gender=genS[0],setGender=genS[1];
+  var locS=useState("");var loc=locS[0],setLoc=locS[1];
+  var snS=useState("");var supName=snS[0],setSupName=snS[1];
+  var seS=useState("");var supEmail=seS[0],setSupEmail=seS[1];
+  var spS=useState("");var supPw=spS[0],setSupPw=spS[1];
+  var srS=useState("");var supRel=srS[0],setSupRel=srS[1];
+  var spnS=useState("");var spName=spnS[0],setSpName=spnS[1];
+  var spdS=useState("");var spDob=spdS[0],setSpDob=spdS[1];
+  var condS=useState([]);var conditions=condS[0],setConditions=condS[1];
+  var surgS=useState("THR");var surg=surgS[0],setSurg=surgS[1];
+  var sideS=useState("");var side=sideS[0],setSide=sideS[1];
+  var weekS=useState(1);var week=weekS[0],setWeek=weekS[1];
+  var painS=useState(3);var pain=painS[0],setPain=painS[1];
+  var phaseS=useState("recovery");var phase=phaseS[0],setPhase=phaseS[1];
+  var bmS=useState({});var bm=bmS[0],setBm=bmS[1];
+  var bnS=useState("");var bmNote=bnS[0],setBmNote=bnS[1];
+  var brsS=useState(null);var bmRatingSel=brsS[0],setBmRatingSel=brsS[1];
+  var streakS=useState(0);var streak=streakS[0],setStreak=streakS[1];
+  var eqS=useState([]);var equipAids=eqS[0],setEquipAids=eqS[1];
+  var uidS=useState("");var uid=uidS[0],setUid=uidS[1];
+  var assS=useState({});var assessments=assS[0],setAssessments=assS[1];
+  var aaS=useState({});var aAdl=aaS[0],setAAdl=aaS[1];
+  var aacS=useState("Meal Prep");var aAdlCat=aacS[0],setAAdlCat=aacS[1];
+  var outS=useState([]);var outcomes=outS[0],setOutcomes=outS[1];
+  var achS=useState({});var achieved=achS[0],setAchieved=achS[1];
+  var gaS=useState({});var goalAssessments=gaS[0],setGoalAssessments=gaS[1];
+  var extS=useState(false);var extended=extS[0],setExtended=extS[1];
+  var sdtS=useState("");var surgDate=sdtS[0],setSurgDate=sdtS[1];
+  var drS=useState({});var dailyRatings=drS[0],setDailyRatings=drS[1];
+  var wrConfS=useState({});var weeklyConf=wrConfS[0],setWeeklyConf=wrConfS[1];
+  var wrNoteS=useState("");var weeklyNote=wrNoteS[0],setWeeklyNote=wrNoteS[1];
+  var wrSavedS=useState(false);var wrSaved=wrSavedS[0],setWrSaved=wrSavedS[1];
+
+    var msgS=useState([{f:"c",t:"Hi there! I'm Sarah, your recovery coach. I'm here whenever you need me — whether you want to talk through how you're feeling, get tips for daily tasks, or just need some encouragement. What's on your mind today?",tm:"Now"}]);var msgs=msgS[0],setMsgs=msgS[1];
+  var cvS=useState("");var chatVal=cvS[0],setChatVal=cvS[1];
+  var clS=useState(false);var chatLoading=clS[0],setChatLoading=clS[1];
+  var shS=useState([]);var sessionHistory=shS[0],setSessionHistory=shS[1];
+  var dtDateS=useState(todayKey());var doneTasksDate=dtDateS[0],setDoneTasksDate=dtDateS[1];
+  var srS2=useState(null);var selRes=srS2[0],setSelRes=srS2[1];
+  var szS=useState(null);var selZone=szS[0],setSelZone=szS[1];
+  var notS=useState("");var newOutText=notS[0],setNewOutText=notS[1];
+  var dtS=useState({});var doneTasks=dtS[0],setDoneTasks=dtS[1];
+  var etS=useState(null);var expandedTask=etS[0],setExpandedTask=etS[1];
+  /* PLAN STATE */
+  var spS2=useState(null);var supportPlan=spS2[0],setSupportPlan=spS2[1];
+    var tourS=useState(0);var tourStep=tourS[0],setTourStep=tourS[1];
+  var tourActiveS=useState(false);var tourActive=tourActiveS[0],setTourActive=tourActiveS[1];
+  var efS=useState("");var editFrom=efS[0],setEditFrom=efS[1];
+  var udS=useState([]);var uploadedDocs=udS[0],setUploadedDocs=udS[1];
+  var dpS=useState(false);var docProcessing=dpS[0],setDocProcessing=dpS[1];
+  var djuS=useState(false);var docJustUploaded=djuS[0],setDocJustUploaded=djuS[1];
+  var dutS=useState("");var docUpType=dutS[0],setDocUpType=dutS[1];
+  var etoS=useState(null);var errorToast=etoS[0],setErrorToast=etoS[1];
+  var ldS=useState(true);var loading=ldS[0],setLoading=ldS[1];
+  var aoS=useState(false);var ageOk=aoS[0],setAgeOk=aoS[1];
+  var rcS=useState(false);var resetConfirm=rcS[0],setResetConfirm=rcS[1];
+  var ppS=useState(false);var ppOpen=ppS[0],setPpOpen=ppS[1];
+  var ckMoodS=useState("ok");var ckMood=ckMoodS[0],setCkMood=ckMoodS[1];
+  var ckComfortS=useState(3);var ckComfort=ckComfortS[0],setCkComfort=ckComfortS[1];
+  var ckSavedS=useState(false);var ckSaved=ckSavedS[0],setCkSaved=ckSavedS[1];
+  var snS=useState(false);var sarahNudgeDismissed=snS[0],setSarahNudgeDismissed=snS[1];
+  var bmOpenS=useState(false);var bmOpen=bmOpenS[0],setBmOpen=bmOpenS[1];
+  var cnS=useState("Sarah");var coachName=cnS[0],setCoachName=cnS[1];
+  var coachInputS=useState("Sarah");var coachInput=coachInputS[0],setCoachInput=coachInputS[1];
+  var showToast=useCallback(function(msg){setErrorToast(msg);setTimeout(function(){setErrorToast(null);},4000);},[]);
+  var chatRef=useRef(null);var scrollRef=useRef(null);var filePickRef=useRef(null);var camPickRef=useRef(null);
+  var loadedRef=useRef(false);
+
+  /* ═══ STATE PERSISTENCE via window.storage ═══ */
+  useEffect(function(){
+    if(loadedRef.current){setLoading(false);return;}loadedRef.current=true;
+    if(!window.storage){setLoading(false);return;}
+    (async function(){try{
+      var r=await window.storage.get("nable-state");
+      if(!r||!r.value)return;
+      var s=JSON.parse(r.value);
+      if(s.name)setName(s.name);if(s.surname)setSurname(s.surname);if(s.email)setEmail(s.email);if(s.dob)setDob(s.dob);
+      if(s.gender)setGender(s.gender);if(s.loc)setLoc(s.loc);if(s.surg)setSurg(s.surg);
+      if(s.side)setSide(s.side);if(s.week)setWeek(s.week);
+      if(s.pain!==undefined)setPain(s.pain);if(s.uid)setUid(s.uid);
+      if(s.surgDate)setSurgDate(s.surgDate);if(s.extended)setExtended(s.extended);
+      if(s.conditions)setConditions(s.conditions);if(s.appMode)setAppMode(s.appMode);
+      if(s.assessments)setAssessments(s.assessments);if(s.outcomes)setOutcomes(s.outcomes);
+      if(s.achieved)setAchieved(s.achieved);if(s.goalAssessments)setGoalAssessments(s.goalAssessments);if(s.bm)setBm(s.bm);
+      if(s.aAdl)setAAdl(s.aAdl);
+      if(s.equipAids)setEquipAids(s.equipAids);if(s.uploadedDocs)setUploadedDocs(s.uploadedDocs);
+      if(s.sessionHistory)setSessionHistory(s.sessionHistory);if(s.streak)setStreak(s.streak);
+      if(s.doneTasks)setDoneTasks(s.doneTasks);if(s.doneTasksDate)setDoneTasksDate(s.doneTasksDate);
+      
+      
+      
+      
+      
+      
+      
+      if(s.coachName)setCoachName(s.coachName);
+      if(s.msgs&&s.msgs.length>0)setMsgs(s.msgs);if(s.sarahNudgeDismissed)setSarahNudgeDismissed(true);if(s.goalAssessments)setGoalAssessments(s.goalAssessments);
+      if(s.uid)setScr("home");if(!s.bm||Object.keys(s.bm).length===0)setBmOpen(true);
+    }catch(e){console.log("Load error:",e);}finally{setLoading(false);}})();
+  },[]);
+  useEffect(function(){
+    if(!window.storage||!uid)return;
+    var tm=setTimeout(function(){
+      var s={name:name,surname:surname,email:email,dob:dob,gender:gender,loc:loc,surg:surg,side:side,
+        phase:phase,week:week,pain:pain,uid:uid,surgDate:surgDate,extended:extended,
+        conditions:conditions,appMode:appMode,assessments:assessments,outcomes:outcomes,
+        achieved:achieved,goalAssessments:goalAssessments,bm:bm,aAdl:aAdl,equipAids:equipAids,
+        uploadedDocs:uploadedDocs,sessionHistory:sessionHistory,streak:streak,
+        doneTasks:doneTasks,doneTasksDate:doneTasksDate,msgs:msgs.slice(-20),sarahNudgeDismissed:sarahNudgeDismissed,scr:scr,
+        coachName:coachName,
+        };
+      window.storage.set("nable-state",JSON.stringify(s)).catch(function(){});
+    },500);
+    return function(){clearTimeout(tm);};
+  },[name,surname,email,surg,side,phase,week,pain,uid,surgDate,extended,conditions,assessments,outcomes,achieved,goalAssessments,bm,aAdl,equipAids,uploadedDocs,sessionHistory,streak,doneTasks,doneTasksDate,msgs,sarahNudgeDismissed,scr,coachName]);
+
+  var st=surg||"THR";
+  var dName=appMode==="supporter"?spName:(name+(surname?" "+surname:""));
+  var maxW=extended?12:8;
+  var dailyTasks=useMemo(function(){return genDailyTasks(outcomes,st,week,aAdl);},[outcomes,st,week,aAdl]);
+  var doneTaskN=useMemo(function(){return dailyTasks.filter(function(t){return doneTasks[t.id];}).length;},[dailyTasks,doneTasks]);
+
+  var go=useCallback(function(s){setScr(s);setSelRes(null);},[]);
+  var top2=useCallback(function(){setTimeout(function(){if(scrollRef.current)scrollRef.current.scrollTop=0;},10);},[]);
+  var goTop=useCallback(function(s){go(s);top2();},[go,top2]);
+  useEffect(function(){if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight;},[msgs]);
+  var handleNav=useCallback(function(id){go(id);top2();},[go,top2]);
+  useEffect(function(){if(surgDate&&phase==="recovery"){var calc=calcWeekFromDate(surgDate);if(calc!==null&&calc!==week)setWeek(calc);}},[surgDate,phase]);
+  useEffect(function(){var today=todayKey();if(doneTasksDate!==today){setDoneTasks({});setDoneTasksDate(today);}},[doneTasksDate]);
+  var bmAlerts=useMemo(function(){return getBodyMapAlerts(bm,st,side);},[bm,st,side]);
+  var sendChat=useCallback(function(){var v=chatVal.trim();if(!v)return;setChatVal("");setMsgs(function(p){return[...p,{f:"u",t:v,tm:"Now"}];});setChatLoading(true);var j=st==="THR"?"hip":"knee";var ctx="Patient: "+(dName||"User")+". "+(st?"Surgery: "+j+" replacement ("+side+" side). Week "+week+" of "+maxW+".":"Recovery context: no specific surgery.")+" Comfort level: "+pain+"/10.";if(assessments.first&&assessments.first.oAdl)ctx+=" Daily living self-rating: "+assessments.first.oAdl.toFixed(1)+"/10.";if(sessionHistory.length>0){var lastS=sessionHistory[sessionHistory.length-1];ctx+=" Last check-in: comfort "+lastS.pain+"/10, mood: "+lastS.diff+".";}if(bmAlerts.length>0)ctx+=" Emotional wellbeing concerns: "+bmAlerts.map(function(a){return a.zone+" ("+a.status+")";}).join(", ")+". These reflect where the user feels recovery stress in their body. Be sensitive and supportive.";if(outcomes.length>0){var goalCtx=[];outcomes.forEach(function(o){var ga=goalAssessments[o.id];if(ga&&ga.daily&&ga.daily.length>0){var recent=ga.daily.slice(-3).map(function(d){return d.rating;});var wk=ga.weekly&&ga.weekly.length>0?ga.weekly[ga.weekly.length-1].confidence:null;goalCtx.push(o.text+" — recent: "+recent.join(",")+"/5"+(wk!==null?", confidence: "+wk+"/10":""));}});if(goalCtx.length>0)ctx+=" Goal progress: "+goalCtx.join("; ")+".";}var sysPrompt="You are "+coachName+", a recovery coach for the N-Able app. You support people recovering from hip and knee replacement surgery. Be warm, encouraging, and helpful. Keep responses concise (2-4 sentences max). If the user describes anything that sounds like a medical concern, warmly encourage them to contact their GP or call NHS 111. Do not assess symptoms or provide clinical advice."+" Patient context: "+ctx;var apiMsgs=[];msgs.slice(-8).forEach(function(m){apiMsgs.push({role:m.f==="u"?"user":"assistant",content:m.t});});apiMsgs.push({role:"user",content:v});var ac=new AbortController();var timeout=setTimeout(function(){ac.abort();},15000);fetch("https://api.anthropic.com/v1/messages",{signal:ac.signal,method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:400,system:sysPrompt,messages:apiMsgs})}).then(function(r){clearTimeout(timeout);return r.json();}).then(function(d){if(d.error){throw new Error(d.error.message||"API error");}var reply=d.content?d.content.map(function(b){return b.text||"";}).join(""):"I couldn't process that right now. Please try again.";setMsgs(function(p){return[...p,{f:"c",t:reply,tm:"Now"}];});setChatLoading(false);}).catch(function(e){clearTimeout(timeout);var errMsg=e.name==="AbortError"?"Sorry, my response timed out. Please try again or call 111 if your question is urgent.":"I'm having trouble connecting right now. For medical concerns, please call 111 or 999 for emergencies.";setMsgs(function(p){return[...p,{f:"c",t:errMsg,tm:"Now"}];});setChatLoading(false);showToast("Coach connection failed — see message above");});},[chatVal,st,side,week,maxW,pain,phase,dName,assessments,sessionHistory,bmAlerts,msgs,coachName,outcomes,goalAssessments]);
+
+  /* ─── PLAN: Build personalised plan instantly (no API) ─── */
+  var buildPlan=useCallback(function(){
+    return makePersonalisedPlan(st, week, maxW, side, pain, assessments, outcomes, conditions, equipAids, bm, uploadedDocs, achieved);
+  },[st,week,maxW,side,pain,assessments,outcomes,conditions,equipAids,bm,uploadedDocs,achieved]);
+  var eqPlan=useMemo(function(){return supportPlan||buildPlan();},[supportPlan,buildPlan]);
+  useEffect(function(){if(uid){setSupportPlan(buildPlan());}},[uid,buildPlan]);
+
+  /* ─── DEV SKIP: Pre-fill all setup data and jump to home ─── */
+  var devSkip=useCallback(function(){
+    setName("Test");setSurname("Patient");setEmail("test@nable.uk");setPw("demo123");setDob("1972-06-15");setGender("Male");setLoc("Manchester");
+    setSurg("TKR");setSide("Right");setWeek(3);setPain(5);setPhase("recovery");
+    setSurgDate("2026-03-09");setCoachName("Pip");
+    setConditions(["c_hipknee","c_arthritis"]);
+    setUid(genUID());
+    var hist=[];for(var d=6;d>=0;d--){var dt=new Date();dt.setDate(dt.getDate()-d);var k=dt.getFullYear()+"-"+(dt.getMonth()+1)+"-"+dt.getDate();var moods=["good","ok","tough"];hist.push({pain:3+Math.floor(Math.random()*5),diff:moods[Math.floor(Math.random()*3)],date:k});}
+    setSessionHistory(hist);setStreak(7);
+    var adl={};
+    Object.entries(ADL_CATS).forEach(function(entry){entry[1].items.forEach(function(it){adl[it]=3+Math.floor(Math.random()*5);});});
+    setAAdl(adl);
+    var catAvg3={};Object.entries(ADL_CATS).forEach(function(entry){var c2=entry[0],d2=entry[1];var sc=d2.items.map(function(it){return adl[it]||0;});catAvg3[c2]=(sc.reduce(function(a,b){return a+b;},0)/sc.length).toFixed(1);});
+    var oAdl3=(Object.values(catAvg3).reduce(function(a,b){return a+parseFloat(b);},0)/Object.values(catAvg3).length);
+    setAssessments({first:{adl:adl,catAvg:catAvg3,oAdl:oAdl3,date:todayKey()}});
+    var outs=[];
+    Object.entries(catAvg3).forEach(function(entry){if(parseFloat(entry[1])<=5)outs.push({id:"o_"+entry[0],text:"Feel more confident with "+entry[0].toLowerCase(),cat:"ADL: "+entry[0]});});
+    setOutcomes(outs);
+    var achObj={};if(outs.length>0)achObj[outs[0].id]="achieved";if(outs.length>1)achObj[outs[1].id]="working";setAchieved(achObj);
+    setBm({head:{status:"amber",note:"Racing thoughts at night"},chest:{status:"red",note:"Anxious about going back to work"},shoulders:{status:"amber",note:"Carrying a lot of tension"},lowb:{status:"green",note:"Managing OK with rest"}});
+    var devRooms=[
+      {room:"Kitchen",results:{roomType:"Kitchen",summary:"5/8 items in place. 3 actions identified.",suggestions:[
+        {name:"Perching stool available at worktop",category:"Equipment",priority:"Essential",reason:"Not currently in place",note:"Need to order from OT"},
+        {name:"Non-slip mat in front of sink",category:"Safety",priority:"Recommended",reason:"Identified as needed",note:""},
+        {name:"Trolley to transport items safely",category:"Equipment",priority:"Recommended",reason:"Identified as needed",note:"Using walking frame tray for now"}
+      ]}},
+      {room:"Bathroom",results:{roomType:"Bathroom",summary:"4/8 items in place. 4 actions identified.",suggestions:[
+        {name:"Grab rails fitted beside toilet",category:"Safety",priority:"Essential",reason:"Not currently in place",note:"Landlord contacted"},
+        {name:"Grab rails in shower / bath area",category:"Safety",priority:"Essential",reason:"Not currently in place",note:"Landlord contacted"},
+        {name:"Non-slip mat inside bath / shower",category:"Safety",priority:"Essential",reason:"Not currently in place",note:""},
+        {name:"Long-handled sponge / wash aid",category:"Equipment",priority:"Recommended",reason:"Identified as needed",note:""}
+      ]}},
+      {room:"Bedroom",results:{roomType:"Bedroom",summary:"5/7 items in place. 2 actions identified.",suggestions:[
+        {name:"Sock aid / shoe horn / long-handled reacher",category:"Equipment",priority:"Essential",reason:"Not currently in place",note:"Included in hip kit order"},
+        {name:"Clothing laid out at accessible height",category:"Layout",priority:"Recommended",reason:"Identified as needed",note:"Rearranging wardrobe"}
+      ]}}
+    ];
+    setEquipAids(devRooms);
+    setUploadedDocs([
+      {id:"doc_1",type:"Discharge summary",date:"2026-03-09",summary:"Patient underwent right total knee replacement under spinal anaesthesia. Discharged day 2 post-op with standard rehab protocol.",keyPoints:[{category:"Surgery",detail:"Right TKR, cemented implant"},{category:"Anaesthesia",detail:"Spinal with sedation"},{category:"Discharge",detail:"Day 2 post-op, mobilising with crutches"}],medications:[{name:"Paracetamol",dose:"1g four times daily",duration:"As needed"},{name:"Ibuprofen",dose:"400mg three times daily",duration:"2 weeks"}],followUp:[{what:"Wound check",when:"10 days post-op",who:"Practice nurse"},{what:"Outpatient review",when:"6 weeks post-op",who:"Mr Patel"}],uploadDate:"9/3/2026"},
+      {id:"doc_2",type:"Hospital paperwork",date:"2026-03-09",summary:"Post-operative physiotherapy notes. Weight-bearing as tolerated. Stairs one step at a time leading with good leg going up.",keyPoints:[{category:"Mobility",detail:"Full weight bearing with crutches"},{category:"Stairs",detail:"One step at a time, lead with good leg ascending"}],medications:[],followUp:[],uploadDate:"9/3/2026"}
+    ]);
+    setDoneTasks({"dt_mindcheck":true,"dt_meal":true});
+    setMsgs([
+      {f:"c",t:"Hi Test! I'm Pip, your recovery coach. I'm here whenever you need me. What's on your mind today?",tm:"9:00 AM"},
+      {f:"u",t:"I'm feeling anxious about going back to work",tm:"9:01 AM"},
+      {f:"c",t:"That's completely understandable \u2014 returning to work after surgery is a big step and it's natural to feel anxious about it. Many people find it helps to plan a phased return, starting with shorter days. Have you spoken to your employer about a gradual return?",tm:"9:01 AM"}
+    ]);
+    var ga={};outs.forEach(function(o){ga[o.id]={daily:[],weekly:[]};for(var d2=6;d2>=0;d2--){var dt2=new Date();dt2.setDate(dt2.getDate()-d2);var k2=dt2.getFullYear()+"-"+(dt2.getMonth()+1)+"-"+dt2.getDate();ga[o.id].daily.push({date:k2,rating:2+Math.floor(Math.random()*3)});}var wkDate=todayKey();if(ga[o.id]===Object.values(ga)[0]){var oldDt=new Date();oldDt.setDate(oldDt.getDate()-8);wkDate=oldDt.getFullYear()+"-"+(oldDt.getMonth()+1)+"-"+oldDt.getDate();}ga[o.id].weekly.push({weekStart:wkDate,confidence:4+Math.floor(Math.random()*4),adjusted:false});});
+    setGoalAssessments(ga);
+    setSarahNudgeDismissed(true);
+    setSupportPlan(null);
+    goTop("home");
+  },[goTop]);
+
+  /* ─── DOCUMENT PROCESSING ─── */
+  var processDocument=useCallback(function(base64,mediaType,docType){
+    setDocProcessing(true);
+    var ct=new AbortController();var tm=setTimeout(function(){ct.abort();},30000);
+    var content=[{type:mediaType.startsWith("application/pdf")?"document":"image",source:{type:"base64",media_type:mediaType,data:base64}},{type:"text",text:"This is a "+docType+" from an NHS hospital for a patient who had a "+(st==="THR"?"total hip":"total knee")+" replacement. Extract key information to help the user organise their paperwork. Return ONLY valid JSON: {\"type\":\""+docType+"\",\"date\":\"extracted or unknown\",\"summary\":\"2-3 sentences\",\"keyPoints\":[{\"category\":\"string\",\"detail\":\"string\"}],\"medications\":[],\"followUp\":[]}"}];
+    fetch("https://api.anthropic.com/v1/messages",{signal:ct.signal,method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1500,messages:[{role:"user",content:content}]})}).then(function(r){clearTimeout(tm);return r.json();}).then(function(d){
+      var t=d.content.map(function(b){return b.text||"";}).join("");
+      var parsed=JSON.parse(t.replace(/```json|```/g,"").trim());
+      setUploadedDocs(function(p){return[...p,{id:"doc_"+Date.now(),...parsed,uploadDate:new Date().toLocaleDateString()}];});
+      setDocProcessing(false);
+      setSupportPlan(null);
+      setDocJustUploaded(true);
+    }).catch(function(e){
+      var msg=e&&e.name==="AbortError"?"Timed out after 30s":"Failed to process";
+      setUploadedDocs(function(p){return[...p,{id:"doc_"+Date.now(),type:docType,summary:msg+". Try again.",error:true,uploadDate:new Date().toLocaleDateString()}];});
+      setDocProcessing(false);
+      showToast("Document processing failed — "+msg.toLowerCase());
+    });
+  },[st]);
+
+  var handleFileUpload=useCallback(function(e,docType){
+    var file=e.target.files?e.target.files[0]:null;if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(){var b64=reader.result.split(",")[1];processDocument(b64,file.type,docType);};
+    reader.readAsDataURL(file);e.target.value="";
+  },[processDocument]);
+
+  /* ═══ ERROR TOAST — imperative DOM render so it shows on every screen ═══ */
+  useEffect(function(){
+    if(!errorToast)return;
+    var d=document.createElement("div");
+    d.textContent=errorToast;
+    d.setAttribute("role","alert");
+    d.style.cssText="position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#D32F2F;color:#FFF;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);cursor:pointer;max-width:340px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
+    d.onclick=function(){setErrorToast(null);};
+    document.body.appendChild(d);
+    return function(){if(d.parentNode)d.parentNode.removeChild(d);};
+  },[errorToast]);
+
+  /* ═══ SCREENS ═══ */
+  if(loading)return(<Frame><div style={{background:"linear-gradient(180deg,"+C.p+","+C.pl+")",flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:C.w}}><div style={{width:72,height:72,background:"rgba(255,255,255,.2)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,marginBottom:20}}>{"\u2665"}</div><div style={{fontSize:30,fontWeight:800}}>N-ABLE</div></div></Frame>);
+  if(scr==="welcome")return(<Frame><div style={{background:"linear-gradient(180deg,"+C.p+","+C.pl+")",flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,color:C.w,textAlign:"center"}}><div style={{width:72,height:72,background:"rgba(255,255,255,.2)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,marginBottom:20}}>{"\u2665"}</div><div style={{fontSize:30,fontWeight:800,marginBottom:4}}>N-ABLE</div><div style={{fontSize:13,opacity:.8,letterSpacing:2,marginBottom:28}}>YOUR DAILY RECOVERY COACH</div><div style={{fontSize:16,lineHeight:1.6,marginBottom:16,maxWidth:280}}>Your personalised recovery and daily living coach</div><div style={{textAlign:"left",marginBottom:32,maxWidth:280}}>{[{ic:"\u2705",tx:"Daily tasks to rebuild independence"},{ic:"\u{1F4CA}",tx:"Track comfort, body & daily living progress"},{ic:"\u{1F3E0}",tx:"Home safety checks & equipment advice"}].map(function(b,i){return(<div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}><span style={{fontSize:18,flexShrink:0}}>{b.ic}</span><span style={{fontSize:14,lineHeight:1.4,opacity:.95}}>{b.tx}</span></div>);})}</div><button onClick={function(){go("gdpr");}} style={{background:"transparent",color:C.w,border:"2px solid rgba(255,255,255,.5)",borderRadius:12,padding:"14px 28px",fontSize:16,fontWeight:600,cursor:"pointer"}}>Get Started</button><div style={{display:"flex",gap:8,marginTop:24}}><div onClick={devSkip} style={{padding:"8px 14px",borderRadius:8,background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.6)",fontSize:11,fontWeight:600,cursor:"pointer",letterSpacing:1}}>DEV SKIP {"\u2192"}</div></div></div></Frame>);
+  if(scr==="gdpr")return(<Frame><Hdr title="Privacy & GDPR" back={function(){go("welcome");}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}><Cd><div style={{fontSize:14,fontWeight:700,color:C.p,marginBottom:8}}>Our Mission</div><div style={{fontSize:13,lineHeight:1.7}}>N-Able focuses on your potential, not limitations.</div></Cd><Cd><div style={{fontSize:14,fontWeight:700,color:C.p,marginBottom:8}}>Privacy</div><div style={{fontSize:13,lineHeight:1.7}}>Data encrypted per UK GDPR. Access, correct or delete anytime.</div></Cd><Cd style={{background:C.pp,border:"2px solid "+C.p}}><div style={{fontSize:13,fontWeight:500}}>By continuing you agree to our <span onClick={function(e){e.stopPropagation();setPpOpen(!ppOpen);}} role="button" tabIndex={0} onKeyDown={function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();setPpOpen(!ppOpen);}}} style={{color:C.p,fontWeight:700,cursor:"pointer",textDecoration:"underline"}}>Privacy Policy</span>.</div>{/* TODO: replace placeholder policy text with reviewed copy before launch */}{ppOpen&&<div style={{fontSize:12,lineHeight:1.6,color:C.tx,marginTop:10,paddingTop:10,borderTop:"1px solid "+C.pl}}>N-Able UK stores your recovery data locally on your device to personalise your recovery. Data is encrypted when synced. You can view, export, or delete all your data at any time from Settings. For data requests contact privacy@nable.uk.</div>}</Cd><div onClick={function(){setAgeOk(!ageOk);}} role="checkbox" tabIndex={0} aria-checked={ageOk} onKeyDown={function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();setAgeOk(!ageOk);}}} style={{display:"flex",alignItems:"center",gap:12,padding:14,borderRadius:12,border:"2px solid "+(ageOk?C.p:"#E8E0ED"),background:ageOk?C.pp:C.w,marginTop:6,marginBottom:10,cursor:"pointer"}}><div style={{width:22,height:22,borderRadius:6,border:"2px solid "+(ageOk?C.p:"#CCC"),background:ageOk?C.p:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ageOk&&<span style={{color:C.w,fontSize:13,fontWeight:700}}>{"\u2713"}</span>}</div><span style={{fontSize:14,fontWeight:600}}>I confirm I am 18 or over</span></div><div style={{display:"flex",gap:10,marginTop:6}}><Btn onClick={function(){go("welcome");}} secondary>Exit</Btn><Btn onClick={function(){if(ageOk)go("who");}} disabled={!ageOk}>I Agree</Btn></div></div></Frame>);
+  if(scr==="who")return(<Frame><Hdr title="Who is this for?" back={function(){go("gdpr");}}/><div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",padding:28}}>{[{v:"self",l:"For myself",ic:"\u{1F64B}"},{v:"supporter",l:"Supporting someone",ic:"\u{1F91D}"}].map(function(o){return(<div key={o.v} onClick={function(){setAppMode(o.v);go(o.v==="self"?"profA":"supDisc");}} style={{padding:22,borderRadius:16,border:"2px solid #E8E0ED",background:C.w,marginBottom:14,cursor:"pointer"}}><div style={{fontSize:26,marginBottom:6}}>{o.ic}</div><div style={{fontSize:16,fontWeight:700}}>{o.l}</div></div>);})}</div></Frame>);
+  if(scr==="supDisc")return(<Frame><Hdr title="Disclaimer" back={function(){go("who");}}/><div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",padding:28}}><Cd style={{background:"#FFF8E1",border:"1px solid "+C.a}}><div style={{fontSize:14,lineHeight:1.7}}>You must have <strong>permission</strong> from the person you support.</div></Cd><div style={{display:"flex",gap:10,marginTop:8}}><Btn onClick={function(){go("welcome");}} secondary>No</Btn><Btn onClick={function(){go("profB");}}>Yes</Btn></div></div></Frame>);
+  if(scr==="profA")return(<Frame><Hdr title="Your Profile" back={function(){go("who");}} right={uid?<span onClick={function(){go("settings");}} style={{cursor:"pointer",fontSize:18}}>{"\u2699\uFE0F"}</span>:null}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}><Inp label="First Name" value={name} onChange={setName} req/><Inp label="Last Name" value={surname} onChange={setSurname} placeholder="Optional"/><Inp label="Email" value={email} onChange={setEmail} type="email" req/><div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:600,marginBottom:5}}>Password <span style={{color:C.r}}>*</span></div><div style={{position:"relative"}}><input type={pwVisible?"text":"password"} value={pw} onChange={function(e){setPw(e.target.value);}} placeholder="Password" onClick={function(e){e.stopPropagation();}} style={{width:"100%",padding:"12px 44px 12px 14px",borderRadius:12,border:"2px solid #E8E0ED",fontSize:14,outline:"none",boxSizing:"border-box"}}/><button type="button" onClick={function(){setPwVisible(!pwVisible);}} aria-label={pwVisible?"Hide password":"Show password"} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",fontSize:12,cursor:"pointer",padding:4,fontWeight:600,color:C.tl}}>{pwVisible?"Hide":"Show"}</button></div></div><Inp label="Date of Birth" value={dob} onChange={setDob} type="date"/><div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:600,marginBottom:6}}>Gender</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{["Male","Female","Non-binary","Prefer not to say"].map(function(g){return(<div key={g} role="button" tabIndex={0} aria-pressed={gender===g} onClick={function(){setGender(g);}} onKeyDown={function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();setGender(g);}}} style={{padding:"7px 12px",borderRadius:20,border:"2px solid "+(gender===g?C.p:"#E8E0ED"),background:gender===g?C.pp:C.w,cursor:"pointer",fontSize:12,fontWeight:600}}>{g}</div>);})}</div></div><Inp label="Location" value={loc} onChange={setLoc} placeholder="e.g. Manchester"/><Btn onClick={function(){if(name&&email&&pw){if(editFrom==="settings"){setEditFrom("");go("settings");}else{go("conds");}}}} disabled={!name||!email||!pw}>{editFrom==="settings"?"Save":"Continue"}</Btn></div></Frame>);
+  if(scr==="profB")return(<Frame><Hdr title="Supporter Profile" back={function(){if(editFrom==="settings"){setEditFrom("");go("settings");}else{go("supDisc");}}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}><Inp label="Your Name" value={supName} onChange={setSupName} req/><Inp label="Email" value={supEmail} onChange={setSupEmail} type="email" req/><Inp label="Password" value={supPw} onChange={setSupPw} type="password" req/><div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:600,marginBottom:6}}>Relationship <span style={{color:C.r}}>*</span></div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{["Family","Friend","Carer","Other"].map(function(r2){return(<div key={r2} onClick={function(){setSupRel(r2);}} style={{padding:"7px 12px",borderRadius:20,border:"2px solid "+(supRel===r2?C.p:"#E8E0ED"),background:supRel===r2?C.pp:C.w,cursor:"pointer",fontSize:12,fontWeight:600}}>{r2}</div>);})}</div></div><Inp label="Their Name" value={spName} onChange={setSpName} req/><Inp label="Their DOB" value={spDob} onChange={setSpDob} type="date"/><Btn onClick={function(){if(supName&&supEmail&&supPw&&supRel&&spName){if(editFrom==="settings"){setEditFrom("");go("settings");}else{go("conds");}}}} disabled={!supName||!supEmail||!supPw||!supRel||!spName}>{editFrom==="settings"?"Save":"Continue"}</Btn></div></Frame>);
+  if(scr==="clinical")return(<Frame><Hdr title="About Your Recovery" sub={"For "+(dName||"you")} back={function(){go("conds");}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}><div style={{fontSize:15,fontWeight:700,marginBottom:10}}>Surgery type</div>{[{v:"THR",l:"Hip Replacement"},{v:"TKR",l:"Knee Replacement"}].map(function(o){return(<div key={o.v} onClick={function(){setSurg(o.v);}} style={{padding:16,borderRadius:14,border:"2px solid "+(surg===o.v?C.p:"#E8E0ED"),background:surg===o.v?C.pp:C.w,marginBottom:10,cursor:"pointer",fontWeight:700,fontSize:15}}>{o.l}</div>);})}<div style={{fontSize:15,fontWeight:700,marginTop:12,marginBottom:10}}>Which side?</div><div style={{display:"flex",gap:10}}>{["Left","Right"].map(function(s){return(<div key={s} onClick={function(){setSide(s);}} style={{flex:1,padding:16,borderRadius:14,border:"2px solid "+(side===s?C.p:"#E8E0ED"),background:side===s?C.pp:C.w,textAlign:"center",cursor:"pointer",fontWeight:700}}>{s}</div>);})}</div>{phase==="recovery"&&<div style={{marginTop:8}}><Inp label="Surgery date" value={surgDate} onChange={function(v){setSurgDate(v);var calc=calcWeekFromDate(v);if(calc!==null)setWeek(calc);}} type="date"/>{surgDate&&calcWeekFromDate(surgDate)!==null&&<div style={{background:"#E8F5E9",borderRadius:10,padding:"8px 12px",marginBottom:12,fontSize:12,color:"#2E7D32",fontWeight:600}}>Auto-calculated: Week {calcWeekFromDate(surgDate)}</div>}{!surgDate&&<div><div style={{fontSize:15,fontWeight:700,marginBottom:10}}>Or set week manually</div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:20}}><div onClick={function(){setWeek(function(w){return Math.max(1,w-1);});}} style={{width:46,height:46,borderRadius:"50%",background:C.pp,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,cursor:"pointer",fontWeight:700,color:C.p}}>{"\u2212"}</div><div style={{fontSize:44,fontWeight:800,color:C.p,minWidth:50,textAlign:"center"}}>{week}</div><div onClick={function(){setWeek(function(w){return Math.min(12,w+1);});}} style={{width:46,height:46,borderRadius:"50%",background:C.pp,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,cursor:"pointer",fontWeight:700,color:C.p}}>+</div></div></div>}</div>}<div style={{marginTop:14}}><div style={{fontSize:15,fontWeight:700,marginBottom:10}}>How comfortable are you feeling today?</div><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:10,color:C.r,fontWeight:600}}>0 Very uncomfortable</span><span style={{fontSize:10,color:C.g,fontWeight:600}}>10 Very comfortable</span></div><div style={{display:"flex",justifyContent:"space-between",gap:2}}>{[0,1,2,3,4,5,6,7,8,9,10].map(function(n){return(<div key={n} onClick={function(){setPain(n);}} style={{flex:1,height:36,borderRadius:7,background:pain===n?sCol(n):"#F0F0F0",color:pain===n?C.w:C.tx,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,cursor:"pointer"}}>{n}</div>);})}</div></div><div style={{marginTop:16}}><Btn onClick={function(){go("scanIntro");}} disabled={!side}>Continue</Btn></div></div></Frame>);
+  if(scr==="conds")return(<Frame><Hdr title="About You" back={function(){go(appMode==="self"?"profA":"profB");}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>{CONDITIONS.map(function(c2){return(<div key={c2.id} onClick={function(){setConditions(function(p){return p.includes(c2.id)?p.filter(function(x){return x!==c2.id;}):[...p,c2.id];});}} style={{display:"flex",alignItems:"center",gap:12,padding:14,borderRadius:14,border:"2px solid "+(conditions.includes(c2.id)?C.p:"#E8E0ED"),background:conditions.includes(c2.id)?C.pp:C.w,marginBottom:8,cursor:"pointer"}}><span style={{fontSize:22}}>{c2.ic}</span><div style={{flex:1}}><span style={{fontSize:13,fontWeight:600}}>{c2.l}</span>{c2.desc&&<div style={{fontSize:11,color:C.tl,marginTop:2}}>{c2.desc}</div>}</div><div style={{width:20,height:20,borderRadius:5,border:"2px solid "+(conditions.includes(c2.id)?C.p:"#CCC"),background:conditions.includes(c2.id)?C.p:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>{conditions.includes(c2.id)&&<span style={{color:C.w,fontSize:11,fontWeight:700}}>{"\u2713"}</span>}</div></div>);})}<div style={{fontSize:12,color:C.tl,textAlign:"center",marginTop:8,marginBottom:4}}>Select any that apply, or continue if none are relevant.</div><Btn onClick={function(){if(conditions.includes("c_hipknee")){go("clinical");}else{setSurg("");setSide("");go("scanIntro");}}}>Continue</Btn></div></Frame>);
+  
+  if(scr==="scanIntro")return(<Frame><Hdr title="Room Assessment" back={function(){go("conds");}}/><div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,textAlign:"center"}}><div style={{fontSize:44,marginBottom:20}}>{"\u{1F4F8}"}</div><div style={{fontSize:20,fontWeight:800,marginBottom:10}}>Assess Your Rooms</div><div style={{fontSize:14,color:C.tl,lineHeight:1.6,marginBottom:24,maxWidth:280}}>Upload photos of your rooms and our AI will analyse them for safety hazards and suggest equipment for your recovery.</div><div style={{display:"flex",gap:10,width:"100%"}}><Btn onClick={function(){go("firstAssI");}} secondary>Skip for now</Btn><Btn onClick={function(){go("obScan");}}>Start</Btn></div></div></Frame>);
+  if(scr==="obScan")return(<Frame><Hdr title="Room Assessment" back={function(){go("scanIntro");}}/><Scanner surg={st} onDone={function(r2,res2){setEquipAids(function(p){return[...p.filter(function(e){return e.room!==r2;}),{room:r2,results:res2}];});}}/><div style={{padding:"8px 18px 18px"}}><Btn onClick={function(){go("firstAssI");}}>Continue</Btn></div></Frame>);
+  if(scr==="firstAssI"){var adlCats=Object.keys(ADL_CATS);var adlDone=adlCats.every(function(c2){return ADL_CATS[c2].items.every(function(it){return aAdl[it]!==undefined;});});return(<Frame><Hdr title="About My Daily Life" sub="Help us understand where you'd like support" back={function(){go("scanIntro");}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}><div style={{display:"flex",gap:5,overflowX:"auto",marginBottom:14,paddingBottom:3}}>{adlCats.map(function(c2){var dn=ADL_CATS[c2].items.every(function(it){return aAdl[it]!==undefined;});return(<div key={c2} onClick={function(){setAAdlCat(c2);top2();}} style={{flexShrink:0,padding:"6px 10px",borderRadius:18,border:"2px solid "+(aAdlCat===c2?C.p:dn?C.g:"#E8E0ED"),background:aAdlCat===c2?C.pp:dn?"#E8F5E9":"#F8F6F4",cursor:"pointer",fontSize:10,fontWeight:700,color:aAdlCat===c2?C.p:dn?C.g:C.tl,whiteSpace:"nowrap"}}>{ADL_CATS[c2].ic+" "+c2+(dn?" \u2713":"")}</div>);})}</div><div style={{fontSize:12,color:C.tl,fontWeight:600,marginBottom:8}}>How are you managing? (0 = really struggling, 10 = managing well)</div>{ADL_CATS[aAdlCat].items.map(function(it){var scored=aAdl[it]!==undefined;return(<Cd key={it} style={{padding:12,border:!scored?"2px solid #FFE0B2":"2px solid transparent"}}><div style={{display:"flex",alignItems:"center",gap:4,marginBottom:4}}><span style={{fontSize:13,fontWeight:700}}>{it}</span>{!scored&&<span style={{fontSize:10,color:C.a,fontWeight:600,marginLeft:"auto"}}>Required</span>}</div><Score10 value={scored?aAdl[it]:-1} onChange={function(n){setAAdl(function(p){var o={...p};o[it]=n;return o;});}}/></Cd>);})}  {(function(){var ci=adlCats.indexOf(aAdlCat);if(ci<adlCats.length-1)return(<Btn onClick={function(){setAAdlCat(adlCats[ci+1]);top2();}}>{"Next: "+adlCats[ci+1]}</Btn>);return(<Btn onClick={function(){go("setGoals");}} disabled={!adlDone}>Review & Set Goals</Btn>);})()}</div></Frame>);}
+
+  /* ═══ ASSESSMENT ═══ */
+  if(scr==="setGoals"){var catAvg2={};Object.entries(ADL_CATS).forEach(function(entry){var c2=entry[0],d=entry[1];var sc=d.items.map(function(it){return aAdl[it];}).filter(function(v){return v!==undefined;});catAvg2[c2]=sc.length?(sc.reduce(function(a,b){return a+b;},0)/sc.length).toFixed(1):"0";});var oAdl2=(Object.values(catAvg2).reduce(function(a,b){return a+parseFloat(b);},0)/Object.values(catAvg2).length).toFixed(1);var sug=[];Object.entries(catAvg2).forEach(function(entry){var c2=entry[0],v=entry[1];if(parseFloat(v)<=6)sug.push({cat:"ADL: "+c2,text:GOAL_TEXT[c2]||"Feel more confident with "+c2.toLowerCase()});});var saveGoals=function(){setAssessments(function(p){var o={...p};o.first={adl:{...aAdl},catAvg:catAvg2,oAdl:parseFloat(oAdl2),date:todayKey()};return o;});setSupportPlan(null);setUid(genUID());goTop("obDone");};return(<Frame><Hdr title="My Priorities" back={function(){go("firstAssI");}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}><Cd style={{background:C.pp}}><div style={{fontSize:13,fontWeight:700,color:C.p}}>{"\u{1F331} These shape your daily focus and recovery guide."}</div></Cd><div style={{display:"flex",gap:8,marginBottom:14}}>{[{l:"Daily Living",v:oAdl2,ic:"\u{1F3E0}"}].map(function(s){return(<Cd key={s.l} style={{flex:1,textAlign:"center",padding:12}}><div style={{fontSize:16}}>{s.ic}</div><div style={{fontSize:24,fontWeight:800,color:sCol(parseFloat(s.v))}}>{s.v}</div><div style={{fontSize:10,color:C.tl,fontWeight:600}}>{s.l}</div></Cd>);})}</div>{sug.map(function(s,i){var added=outcomes.find(function(o){return o.text===s.text;});return(<div key={i} onClick={function(){if(added)setOutcomes(function(p){return p.filter(function(o){return o.text!==s.text;});});else setOutcomes(function(p){return[...p,{id:"o"+Date.now()+i,text:s.text,cat:s.cat}];});}} style={{padding:14,borderRadius:14,border:"2px solid "+(added?C.g:"#E8E0ED"),background:added?"#E8F5E9":C.w,marginBottom:8,cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:20,height:20,borderRadius:5,border:"2px solid "+(added?C.g:"#CCC"),background:added?C.g:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>{added&&<span style={{color:C.w,fontSize:10,fontWeight:700}}>{"\u2713"}</span>}</div><div><div style={{fontSize:13,fontWeight:600}}>{s.text}</div><div style={{fontSize:11,color:C.tl}}>{s.cat}</div></div></div></div>);})}<div style={{marginTop:8,display:"flex",gap:6,marginBottom:14}}><input value={newOutText} onChange={function(e){setNewOutText(e.target.value);}} onClick={function(e){e.stopPropagation();}} placeholder="Add your own goal..." style={{flex:1,padding:"10px 12px",borderRadius:12,border:"2px solid #E8E0ED",fontSize:13,outline:"none"}}/><button onClick={function(){if(newOutText.trim()){setOutcomes(function(p){return[...p,{id:"o"+Date.now(),text:newOutText.trim(),cat:"Custom"}];});setNewOutText("");}}} style={{background:C.p,color:C.w,border:"none",borderRadius:12,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Add</button></div><Btn onClick={saveGoals}>Complete Setup</Btn><Btn onClick={function(){setUid(genUID());goTop("obDone");}} secondary>I'll do this later</Btn></div></Frame>);}
+  if(scr==="manageOut")return(<Frame><Hdr title="My Priorities" back={function(){goTop("home");}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}><Cd style={{background:C.pp}}><div style={{fontSize:13,fontWeight:700,color:C.p}}>{"\u{1F3AF} Tap \u2713 to toggle. \u2715 to remove."}</div></Cd>{outcomes.map(function(o){var st3=achieved[o.id]||"not_started";var dn=st3==="achieved";return(<div key={o.id} style={{display:"flex",alignItems:"center",gap:10,padding:14,borderRadius:14,border:"2px solid "+(dn?C.g:"#E8E0ED"),background:dn?"#E8F5E9":C.w,marginBottom:8}}><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,textDecoration:dn?"line-through":"none"}}>{o.text}</div><div style={{fontSize:11,color:C.tl,marginBottom:6}}>{o.cat}</div><div style={{display:"flex",gap:4}}>{[{s:"not_started",l:"Not started",c:"#CCC"},{s:"working",l:"Working on it",c:C.a},{s:"achieved",l:"Achieved",c:C.g}].map(function(opt){var active=st3===opt.s;return(<div key={opt.s} onClick={function(e){e.stopPropagation();setAchieved(function(p){var o2={...p};o2[o.id]=opt.s;return o2;});}} style={{padding:"4px 8px",borderRadius:10,fontSize:10,fontWeight:600,cursor:"pointer",background:active?opt.c:"transparent",color:active?C.w:C.tl,border:"1px solid "+(active?opt.c:"#E0E0E0")}}>{opt.l}</div>);})}</div></div><span onClick={function(){setOutcomes(function(p){return p.filter(function(x){return x.id!==o.id;});});}} style={{color:C.r,fontSize:16,cursor:"pointer"}}>{"\u2715"}</span></div>);})}
+    <div style={{marginTop:12}}><div style={{display:"flex",gap:6}}><input value={newOutText} onChange={function(e){setNewOutText(e.target.value);}} onClick={function(e){e.stopPropagation();}} placeholder="Add a goal..." style={{flex:1,padding:"10px 12px",borderRadius:12,border:"2px solid #E8E0ED",fontSize:13,outline:"none"}}/><button onClick={function(){if(newOutText.trim()){setOutcomes(function(p){return[...p,{id:"o"+Date.now(),text:newOutText.trim(),cat:"Custom"}];});setNewOutText("");}}} style={{background:C.p,color:C.w,border:"none",borderRadius:12,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Add</button></div></div><div style={{marginTop:14}}><Btn onClick={function(){goTop("home");}}>Done</Btn></div></div></Frame>);
+  if(scr==="obDone")return(<Frame><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"28px 22px"}}><div style={{textAlign:"center",marginBottom:24}}><div style={{width:68,height:68,borderRadius:"50%",background:C.g,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,margin:"0 auto 16px"}}>{"\u2713"}</div><div style={{fontSize:24,fontWeight:800}}>All Set!</div></div><Cd style={{background:C.pp}}><div style={{fontSize:12,color:C.tl}}>ID</div><div style={{fontSize:16,fontWeight:800,color:C.p,letterSpacing:2}}>{uid}</div></Cd><Btn onClick={function(){goTop("nameCoach");}}>Continue</Btn><Btn onClick={function(){goTop("home");}} secondary>Skip to Dashboard</Btn></div></Frame>);
+
+  if(scr==="nameCoach")return(<Frame><div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,textAlign:"center"}}>
+  <div style={{fontSize:44,marginBottom:16}}>{"\u{1F4AC}"}</div>
+  <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>Name Your Recovery Coach</div>
+  <div style={{fontSize:13,color:C.tl,lineHeight:1.6,marginBottom:20,maxWidth:280}}>Your recovery coach is here 24/7 to support you. Give them a name that feels right.</div>
+  <input value={coachInput} onChange={function(e){setCoachInput(e.target.value);}} style={{width:"100%",maxWidth:240,padding:"14px",borderRadius:14,border:"2px solid "+C.p,fontSize:18,textAlign:"center",fontWeight:700,color:C.p,outline:"none"}}/>
+  <div style={{width:"100%",maxWidth:280,marginTop:20}}>
+    <Btn onClick={function(){if(coachInput.trim())setCoachName(coachInput.trim());setTourActive(true);setTourStep(0);goTop("home");}}>Continue</Btn>
+    <Btn onClick={function(){goTop("home");}} secondary>Keep Sarah</Btn>
+  </div>
+</div></Frame>);
+
+  /* ═══ APP TOUR — must be before all screen renders ═══ */
+  var tourSteps=[
+    {tab:"home",title:"Home",icon:"\u{1F3E0}",desc:"Your dashboard. Check in daily, track your mood, and see how your week is going.",tip:"Check in daily to build your streak!"},
+    {tab:"goals",title:"My Goals",icon:"\u{1F3AF}",desc:"Your recovery goals with daily and weekly self-assessments. Track how you're feeling about each area of daily life.",tip:"Rate your goals daily with the face scale!"},
+    {tab:"coach",title:"Recovery Coach",icon:"\u{1F4AC}",desc:"Your 24/7 recovery coach. Ask questions, get encouragement, or just talk through how you're feeling.",tip:"Your coach knows your recovery context and can offer personalised support."},
+    {tab:"equip",title:"Equipment",icon:"\u{1FA91}",desc:"Personalised equipment recommendations and room safety assessments for your home.",tip:"Use the AI room scanner for instant safety suggestions!"},
+    {tab:"more",title:"More",icon:"\u2022\u2022\u2022",desc:"Documents, support resources, and settings.",tip:"Upload hospital paperwork to keep everything organised."},
+  ];
+  if(tourActive&&tourStep<tourSteps.length){
+    var ts=tourSteps[tourStep];
+    var isLast=tourStep===tourSteps.length-1;
+    return(<Frame>
+      <div style={{flex:1,position:"relative"}}>
+        <div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"linear-gradient(180deg,rgba(107,45,139,.95),rgba(155,89,182,.90))",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"28px 24px",zIndex:50}}>
+          <div style={{display:"flex",gap:6,marginBottom:20}}>{tourSteps.map(function(x,i){return(<div key={i} style={{width:i===tourStep?20:8,height:8,borderRadius:4,background:i===tourStep?"white":i<tourStep?C.g:"rgba(255,255,255,.3)",transition:"all .3s"}}/> );})}</div>
+          <div style={{width:72,height:72,borderRadius:20,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,marginBottom:16}}>{ts.icon}</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.6)",textTransform:"uppercase",letterSpacing:2,marginBottom:6}}>Step {tourStep+1} of {tourSteps.length}</div>
+          <div style={{fontSize:24,fontWeight:800,color:"white",marginBottom:12,textAlign:"center"}}>{ts.title}</div>
+          <div style={{fontSize:14,color:"rgba(255,255,255,.85)",lineHeight:1.7,textAlign:"center",maxWidth:300,marginBottom:16}}>{ts.desc}</div>
+          <div style={{background:"rgba(255,255,255,.12)",borderRadius:12,padding:"10px 16px",marginBottom:24,maxWidth:300}}><div style={{fontSize:12,color:"rgba(255,255,255,.9)",lineHeight:1.5,textAlign:"center"}}><span style={{fontWeight:700}}>Tip: </span>{ts.tip}</div></div>
+          <div style={{display:"flex",gap:10,width:"100%",maxWidth:300}}>
+            {tourStep>0&&<button onClick={function(){setTourStep(function(s){return s-1;});}} style={{flex:1,padding:"14px",borderRadius:12,border:"2px solid rgba(255,255,255,.3)",background:"transparent",color:"white",fontSize:15,fontWeight:600,cursor:"pointer"}}>Back</button>}
+            <button onClick={function(){if(isLast){setTourActive(false);setTourStep(0);goTop("home");}else{setTourStep(function(s){return s+1;});}}} style={{flex:1,padding:"14px",borderRadius:12,border:"none",background:"white",color:C.p,fontSize:15,fontWeight:700,cursor:"pointer"}}>{isLast?"Start Recovery":"Next"}</button>
+          </div>
+          {!isLast&&<div onClick={function(){setTourActive(false);setTourStep(0);goTop("home");}} style={{marginTop:14,fontSize:13,color:"rgba(255,255,255,.5)",cursor:"pointer"}}>Skip tour</div>}
+        </div>
+      </div>
+      <Nav active={ts.tab} onNav={function(id){var idx=tourSteps.findIndex(function(s){return s.tab===id;});if(idx>=0){setTourStep(idx);}}} coachName={coachName}/>
+    </Frame>);
+  }
+
+  /* ═══ SETTINGS ═══ */
+  if(scr==="settings")return(<Frame><Hdr title="Settings" back={function(){goTop("home");}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>
+    <Cd><div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Profile</div><div style={{fontSize:13,color:C.tl}}>{dName} {"\u00B7"} {email||supEmail} {"\u00B7"} {loc||"\u2014"}</div><button onClick={function(){setEditFrom("settings");go(appMode==="self"?"profA":"profB");}} style={{marginTop:8,background:C.pp,color:C.p,border:"none",borderRadius:10,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Edit Profile</button></Cd>
+    <Cd><div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Recovery</div><div style={{fontSize:13,color:C.tl}}>{st==="THR"?"Hip":"Knee"} ({side}) {"\u00B7"} Week {week}{surgDate?" \u00B7 Surgery: "+surgDate:""}</div><button onClick={function(){go("clinical");}} style={{marginTop:8,background:C.pp,color:C.p,border:"none",borderRadius:10,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Edit</button></Cd>
+    <Cd><div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Recovery Duration</div><div style={{fontSize:13,color:C.tl,marginBottom:10}}>{extended?"12-week extended":"Standard 8-week"}</div><div onClick={function(){setExtended(!extended);}} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}><div style={{width:44,height:24,borderRadius:12,background:extended?C.g:"#CCC",padding:2,transition:"background .3s"}}><div style={{width:20,height:20,borderRadius:"50%",background:C.w,transform:extended?"translateX(20px)":"translateX(0)",transition:"transform .3s",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/></div><span style={{fontSize:13,fontWeight:600}}>{extended?"Extended (12 wks)":"Standard (8 wks)"}</span></div></Cd>
+    <Cd><div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Coach Name</div>
+<input value={coachName} onChange={function(e){setCoachName(e.target.value);}} style={{width:"100%",padding:"10px 14px",borderRadius:12,border:"2px solid #E8E0ED",fontSize:14,outline:"none",boxSizing:"border-box"}}/></Cd>
+    <Cd><div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Conditions</div><button onClick={function(){go("conds");}} style={{background:C.pp,color:C.p,border:"none",borderRadius:10,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Edit</button></Cd>
+    
+    <Cd><div style={{fontSize:15,fontWeight:700,marginBottom:8}}>App Tour</div><div style={{fontSize:12,color:C.tl,marginBottom:8}}>Walk through each tab and learn how the app works.</div><button onClick={function(){setTourActive(true);setTourStep(0);goTop("home");}} style={{background:C.pp,color:C.p,border:"none",borderRadius:10,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Restart Tour</button></Cd>
+    <Cd style={{borderTop:"2px solid "+C.r}}><div style={{fontSize:15,fontWeight:700,marginBottom:4,color:C.r}}>Reset App Data</div><div style={{fontSize:12,color:C.tl,marginBottom:8}}>Clear all data and start fresh. This cannot be undone.</div><button onClick={function(){if(!resetConfirm){setResetConfirm(true);setTimeout(function(){setResetConfirm(false);},3000);return;}if(window.storage)window.storage.delete("nable-state").catch(function(){});setName("");setSurname("");setEmail("");setPw("");setDob("");setGender("");setLoc("");setSurg("THR");setSide("");setSurgDate("");setWeek(1);setPain(3);setPhase("recovery");setConditions([]);setUid("");setAssessments({});setOutcomes([]);setAchieved({});setGoalAssessments({});setBm({});setAAdl({});setEquipAids([]);setUploadedDocs([]);setSessionHistory([]);setStreak(0);setDoneTasks({});setSupportPlan(null);setExtended(false);setCoachName("Sarah");setMsgs([{f:"c",t:"Hi there! I'm Sarah, your recovery coach. What's on your mind today?",tm:"Now"}]);setCoachInput("Sarah");setResetConfirm(false);goTop("welcome");}} style={{background:C.r,color:C.w,border:"none",borderRadius:10,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>{resetConfirm?"Tap again to confirm":"Reset Everything"}</button></Cd>
+  </div></Frame>);
+
+  /* ═══ HOME ═══ */
+  if(scr==="home"){var hour=new Date().getHours();var greeting=hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";return(<Frame><Hdr title={greeting+(dName?", "+dName:"")} sub={st?"Week "+Math.min(week,maxW)+" of your recovery":"Your recovery journey"} right={<button onClick={function(){go("settings");}} aria-label="Settings" style={{cursor:"pointer",fontSize:18,background:"none",border:"none",color:C.w,padding:4}}>{"\u2699\uFE0F"}</button>}/>
+    <div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>
+      <div style={{display:"flex",gap:8,marginBottom:12}}>{[{v:streak,l:"Streak \u{1F525}"},{v:doneTaskN+"/"+dailyTasks.length,l:"To-Do"}].map(function(c2,i){return(<Cd key={i} style={{flex:1,textAlign:"center",padding:10}}><div style={{fontSize:20,fontWeight:800,color:C.p}}>{c2.v}</div><div style={{fontSize:10,color:C.tl}}>{c2.l}</div></Cd>);})}</div>
+      {/* 7-day mood trend */}
+      {uid&&<Cd style={{padding:14}}><div style={{fontSize:14,fontWeight:700,marginBottom:10}}>Your Week</div>{(function(){var last7=[];for(var d2=6;d2>=0;d2--){var dt=new Date();dt.setDate(dt.getDate()-d2);var key2=dt.getFullYear()+"-"+(dt.getMonth()+1)+"-"+dt.getDate();var dayNames=["S","M","T","W","T","F","S"];var entry=sessionHistory.find(function(s){return s.date===key2;});last7.push({key:key2,day:dayNames[dt.getDay()],entry:entry});}var logged=last7.filter(function(d2){return d2.entry;}).length;return(<div><div style={{display:"flex",justifyContent:"space-between"}}>{last7.map(function(d2,i2){return(<div key={i2} style={{textAlign:"center"}}><div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",background:d2.entry?sCol(d2.entry.pain):"transparent",border:d2.entry?"none":"2px solid #E0E0E0"}}>{d2.entry&&<span style={{fontSize:10,color:C.w,fontWeight:700}}>{d2.entry.pain}</span>}</div><div style={{fontSize:10,color:C.tl,marginTop:3}}>{d2.day}</div></div>);})}</div><div style={{fontSize:11,color:C.tl,textAlign:"center",marginTop:8}}>{logged+" of 7 days logged"}</div></div>);})()}</Cd>}
+      {uid&&week>maxW&&!extended&&<Cd style={{background:"#FFF8E1",border:"2px solid "+C.a}}><div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\u{1F4C5}"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.a,marginBottom:4}}>{"You're past week "+maxW+" of your recovery"}</div><div style={{fontSize:12,color:C.tl,marginBottom:8,lineHeight:1.5}}>Would you like to extend to 12 weeks?</div><button onClick={function(){setExtended(true);}} style={{background:C.a,color:C.w,border:"none",borderRadius:10,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Extend to 12 weeks</button></div></div></Cd>}
+      {/* Incomplete-setup nudge */}
+      {uid&&(outcomes.length===0||Object.keys(bm).length===0)&&<Cd style={{background:C.pp,border:"2px solid "+C.pl}}><div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\u{1F527}"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.p,marginBottom:6}}>Complete your setup</div>{outcomes.length===0&&<div onClick={function(){goTop("manageOut");}} style={{fontSize:12,color:C.p,cursor:"pointer",padding:"3px 0"}}>{"▶ Set your outcomes"}</div>}{Object.keys(bm).length===0&&<div onClick={function(){goTop("home");}} style={{fontSize:12,color:C.p,cursor:"pointer",padding:"3px 0"}}>{"▶ Rate your body map"}</div>}</div></div></Cd>}
+      {/* Body map alerts */}
+      {bmAlerts.length>0&&<Cd style={{background:bmAlerts.some(function(a){return a.status==="red";})?C.rl:C.al,border:"1px solid "+(bmAlerts.some(function(a){return a.status==="red";})?C.r:C.a)}}><div style={{fontSize:13,fontWeight:700,color:bmAlerts.some(function(a){return a.status==="red";})?C.r:C.a,marginBottom:4}}>{"\u{1F9CD} Body Map Alert"}</div>{bmAlerts.map(function(a,i){return(<div key={i} style={{fontSize:12,color:C.tx,lineHeight:1.5,padding:"2px 0"}}><span style={{color:a.status==="red"?C.r:C.a,fontWeight:700}}>{a.zone}:</span> {a.msg}</div>);})}</Cd>}
+      {supportPlan&&supportPlan.todaySummary&&<Cd style={{background:"linear-gradient(135deg,"+C.p+","+C.pl+")",color:C.w}}><div style={{fontSize:11,opacity:.8,fontWeight:600}}>{"\u{1F4CB} TODAY'S FOCUS"}</div><div style={{fontSize:13,lineHeight:1.6,marginTop:4}}>{supportPlan.todaySummary}</div></Cd>}
+      
+      {/* Mind & Body Check-in — Dropdown */}
+      {uid&&<Cd onClick={function(){setBmOpen(!bmOpen);}} style={{padding:14,cursor:"pointer"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:14,fontWeight:700}}>{"\u{1F9CD} Mind & Body Check-in"}</div><span style={{fontSize:14,color:C.tl}}>{bmOpen?"\u25B2":"\u25BC"}</span></div>
+        {(function(){var rN=0,aN=0,gN=0;Object.values(bm).forEach(function(v){if(v.status==="red")rN++;if(v.status==="amber")aN++;if(v.status==="green")gN++;});var surgZId=st==="THR"?(side==="Left"?"lh":"rh"):(side==="Left"?"lk":"rk");if(st&&side&&!bm[surgZId])aN++;return(<div style={{display:"flex",gap:8,marginTop:8}}>{[{l:"Struggling",c:C.r,n:rN},{l:"Noticing",c:C.a,n:aN},{l:"Feeling OK",c:C.g,n:gN}].map(function(s){return(<div key={s.l} style={{flex:1,textAlign:"center"}}><div style={{fontSize:18,fontWeight:800,color:s.c}}>{s.n}</div><div style={{fontSize:10,color:C.tl}}>{s.l}</div></div>);})}</div>);})()}
+      </Cd>}
+      {uid&&bmOpen&&<Cd style={{padding:14}}>
+        <BMap zones={bm} onTap={function(z){setBmNote(bm[z]?bm[z].note||"":"");setBmRatingSel(bm[z]?bm[z].status:null);setSelZone(z);}} surg={st} side={side}/>
+        <div style={{textAlign:"center",fontSize:11,color:C.tl,marginTop:8}}>Tap any zone to rate how you're feeling</div>
+      </Cd>}
+      {/* Daily Check-in Card */}
+      {uid&&(function(){var todayLogged=sessionHistory.some(function(s){return s.date===todayKey();});if(todayLogged)return(<Cd style={{textAlign:"center",padding:14,background:C.pp,border:"2px solid "+C.pl}}><div style={{fontSize:13,color:C.g,fontWeight:600}}>{"\u2705 Today's check-in saved"}</div></Cd>);return(<Cd style={{background:C.pp,border:"2px solid "+C.pl}}><div style={{fontSize:15,fontWeight:700,marginBottom:10}}>How has today been?</div><div style={{fontSize:12,color:C.tl,marginBottom:8}}>A quick check-in on your overall day so far</div><div style={{display:"flex",gap:6,marginBottom:12}}>{[{v:"good",l:"\u{1F60A} Good day"},{v:"ok",l:"\u{1F44D} OK day"},{v:"tough",l:"\u{1F614} Tough day"}].map(function(d){return(<div key={d.v} onClick={function(){setCkMood(d.v);}} style={{flex:1,padding:"10px 4px",borderRadius:12,cursor:"pointer",border:"2px solid "+(ckMood===d.v?C.p:"#E8E0ED"),background:ckMood===d.v?C.pp:C.w,fontSize:12,textAlign:"center",fontWeight:600}}>{d.l}</div>);})}</div><div style={{fontSize:13,fontWeight:600,marginBottom:6}}>Comfort level</div><div style={{display:"flex",justifyContent:"space-between",gap:2}}>{[0,1,2,3,4,5,6,7,8,9,10].map(function(n){return(<div key={n} onClick={function(){setCkComfort(n);}} style={{flex:1,height:32,borderRadius:6,background:ckComfort===n?sCol(n):"#F0F0F0",color:ckComfort===n?C.w:C.tx,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,cursor:"pointer"}}>{n}</div>);})}</div><div style={{display:"flex",justifyContent:"space-between",marginTop:3,marginBottom:12}}><span style={{fontSize:10,color:C.r,fontWeight:600}}>0 Very uncomfortable</span><span style={{fontSize:10,color:C.g,fontWeight:600}}>10 Very comfortable</span></div><Btn onClick={function(){if(ckSaved)return;var alreadyLogged=sessionHistory.some(function(s){return s.date===todayKey();});setSessionHistory(function(p){return[...p,{pain:ckComfort,diff:ckMood,date:todayKey()}];});if(!alreadyLogged)setStreak(function(s){return s+1;});if(Math.abs(ckComfort-pain)>=2)setPain(ckComfort);setDoneTasks(function(p){var o={...p};o["dt_review"]=true;return o;});setCkSaved(true);setTimeout(function(){setCkSaved(false);},2000);}}>{ckSaved?"Saved \u2713":"Save"}</Btn>{ckSaved&&ckMood==="tough"&&<div style={{marginTop:10,padding:12,borderRadius:12,background:"#FFF8E1",border:"1px solid "+C.a,textAlign:"center"}}><div style={{fontSize:12,color:C.tx,lineHeight:1.5,marginBottom:6}}>Tough days are normal during recovery. Would you like to update your Mind & Body Check-in?</div><span onClick={function(){setBmOpen(true);}} style={{fontSize:12,color:C.p,fontWeight:600,cursor:"pointer"}}>Open Mind & Body Check-in</span></div>}</Cd>);})()}
+      {/* Goal check-in nudge */}
+      {/* Weekly review nudge */}
+      {/* Sarah nudge — after first check-in */}
+      {sessionHistory.length>=1&&!sarahNudgeDismissed&&<Cd style={{background:"linear-gradient(135deg,"+C.pp+",#EDE0F5)",border:"2px solid "+C.pl}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.p,marginBottom:4}}>Want to talk about how you're feeling?</div><div style={{fontSize:12,color:C.tl,marginBottom:8}}>{coachName+" is here 24/7"}</div><button onClick={function(){go("coach");}} style={{background:C.p,color:C.w,border:"none",borderRadius:10,padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{"Chat with "+coachName}</button></div><span onClick={function(){setSarahNudgeDismissed(true);}} style={{fontSize:16,color:C.tl,cursor:"pointer",padding:"0 2px"}}>{"✕"}</span></div></Cd>}
+      {/* Tour link */}
+      {uid&&!tourActive&&<div style={{textAlign:"center",marginBottom:8}}><span onClick={function(){setTourActive(true);setTourStep(0);}} style={{fontSize:12,color:C.p,cursor:"pointer"}}>New here? Take a quick tour</span></div>}
+      {/* Room Scanner + Documents */}
+      <Cd onClick={function(){goTop("docs");}} style={{background:C.pp,border:"2px solid "+C.pl,cursor:"pointer"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:18}}>{"\u{1F4F7}"}</span>
+          <div><div style={{fontSize:14,fontWeight:700,color:C.p}}>Room Safety Scanner</div>
+          <div style={{fontSize:11,color:C.tl}}>Scan your rooms for safety suggestions</div></div>
+        </div>
+      </Cd>
+      <Cd onClick={function(){goTop("docs");}} style={{cursor:"pointer"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:18}}>{"\u{1F4C4}"}</span>
+          <div><div style={{fontSize:14,fontWeight:700}}>My Documents</div>
+          <div style={{fontSize:11,color:C.tl}}>Hospital letters & paperwork</div></div>
+        </div>
+      </Cd>
+    </div>
+      {/* Zone rating sheet */}
+      {selZone&&(function(){var surgZoneId2=st==="THR"?(side==="Left"?"lh":"rh"):(side==="Left"?"lk":"rk");var zoneData=WELLBEING_ZONES.find(function(z){return z.id===selZone;});var isSurg=selZone===surgZoneId2;var zLb=zoneData?zoneData.lb:(isSurg?"Your Operated Area":selZone);var zonePrompt=zoneData?zoneData.prompt:(isSurg?"Frustration with recovery, fear of re-injury, loss of confidence":"");var curSt=bm[selZone]?bm[selZone].status:(isSurg?"amber":null);var curNote=bm[selZone]?bm[selZone].note||"":"";var pickSt=bmRatingSel||curSt;
+        var closeSheet=function(){setSelZone(null);setBmRatingSel(null);setBmNote("");};
+        var saveRating=function(){if(pickSt){setBm(function(p){var n={...p};n[selZone]={status:pickSt,note:bmNote.trim()};return n;});}closeSheet();};
+        return(<div><div onClick={closeSheet} aria-hidden="true" style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.3)",zIndex:99}}/><div style={{position:"fixed",bottom:0,left:0,right:0,background:C.w,borderRadius:"20px 20px 0 0",boxShadow:"0 -4px 24px rgba(0,0,0,.15)",padding:"20px 22px 32px",zIndex:100,maxWidth:600,margin:"0 auto",maxHeight:"85vh",overflow:"auto"}}>
+        <div style={{width:40,height:4,borderRadius:2,background:"#DDD",margin:"0 auto 14px"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontSize:18,fontWeight:800}}>{zLb}</span><span onClick={closeSheet} style={{cursor:"pointer",fontSize:20,color:C.tl,padding:"0 4px"}}>{"✕"}</span></div>
+        {zonePrompt&&<div style={{fontSize:12,color:C.tl,marginTop:4,lineHeight:1.5,marginBottom:12}}>{"Common feelings: "+zonePrompt}</div>}
+        {isSurg&&<div style={{background:C.rl,borderRadius:10,padding:"8px 12px",marginBottom:12,fontSize:12,color:C.r,fontWeight:600}}>This is your surgical site — marked as significant by default. You can override below.</div>}
+        <div style={{fontSize:13,color:C.tl,marginBottom:12}}>How does this area feel?</div>
+        {[{s:"red",l:"Struggling",sub:"This is really affecting me right now",c:C.r,bg:C.rl},{s:"amber",l:"Noticing it",sub:"I'm aware of this but managing",c:C.a,bg:C.al},{s:"green",l:"Feeling OK",sub:"No real issues here",c:C.g,bg:"#E8F5E9"}].map(function(o){var sel=pickSt===o.s;return(<div key={o.s} onClick={function(){setBmRatingSel(o.s);}} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",borderRadius:14,background:sel?o.bg:C.w,border:"2px solid "+(sel?o.c:"#E8E0ED"),cursor:"pointer",marginBottom:8}}>
+          <div style={{width:22,height:22,borderRadius:"50%",background:o.c,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{sel&&<span style={{color:C.w,fontSize:11,fontWeight:700}}>{"✓"}</span>}</div>
+          <div><div style={{fontSize:14,fontWeight:700}}>{o.l}</div><div style={{fontSize:11,color:C.tl,marginTop:2}}>{o.sub}</div></div>
+        </div>);})}
+        {pickSt&&<div style={{marginTop:4}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>What's the issue? <span style={{fontWeight:400,color:C.tl}}>(optional)</span></div>
+          <textarea value={bmNote} onChange={function(e){setBmNote(e.target.value);}} onClick={function(e){e.stopPropagation();}} placeholder={"Write anything — this is just for you..."} rows={3} style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"2px solid #E8E0ED",fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"inherit",resize:"none",lineHeight:1.5}}/>
+          {curNote&&!bmNote&&<div style={{fontSize:11,color:C.tl,marginTop:4}}>Previous note: "{curNote}"</div>}
+        </div>}
+        {pickSt&&<button onClick={saveRating} style={{width:"100%",background:C.p,color:C.w,border:"none",borderRadius:12,padding:14,fontSize:15,fontWeight:600,cursor:"pointer",marginTop:12}}>Save</button>}
+        {bm[selZone]&&<div onClick={function(){setBm(function(p){var n={...p};delete n[selZone];return n;});closeSheet();}} style={{padding:12,borderRadius:12,textAlign:"center",fontSize:13,color:C.tl,cursor:"pointer",border:"1px solid #E8E0ED",marginTop:8}}>Clear rating</div>}
+        <div style={{fontSize:11,color:C.tl,textAlign:"center",marginTop:8,fontStyle:"italic"}}>{"This is private and helps "+coachName+" support you better."}</div>
+      </div></div>);})()}
+    <Nav active="home" onNav={handleNav} coachName={coachName}/></Frame>);}
+
+  /* ═══ MY GOALS ═══ */
+  if(scr==="goals"){
+    var tasksDone=dailyTasks.filter(function(t){return doneTasks[t.id];}).length;
+    var morningTasks=dailyTasks.filter(function(t){return t.period==="morning";});
+    var afternoonTasks=dailyTasks.filter(function(t){return t.period==="afternoon";});
+    var eveningTasks=dailyTasks.filter(function(t){return t.period==="evening"&&t.id!=="dt_review";});
+    var renderTask=function(t){var dn=doneTasks[t.id];var exp=expandedTask===t.id;return(<div key={t.id} style={{background:C.w,borderRadius:14,marginBottom:6,boxShadow:"0 1px 4px rgba(0,0,0,.05)",opacity:dn?.5:1}}>
+      <div onClick={function(){setDoneTasks(function(p){var o={...p};o[t.id]=!p[t.id];return o;});}} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer"}}>
+        <div style={{width:26,height:26,borderRadius:8,border:"2px solid "+(dn?C.g:"#CCC"),background:dn?C.g:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{dn&&<span style={{color:C.w,fontSize:12,fontWeight:700}}>{"✓"}</span>}</div>
+        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,textDecoration:dn?"line-through":"none"}}>{t.text}</div><div style={{fontSize:11,color:C.tl,marginTop:1}}>{t.cat}</div></div>
+        <span onClick={function(e){e.stopPropagation();setExpandedTask(exp?null:t.id);}} style={{fontSize:16,color:C.tl,cursor:"pointer",padding:"0 4px"}}>{exp?"⌃":"⌄"}</span>
+      </div>
+      {exp&&<div style={{padding:"0 14px 12px",fontSize:12,color:C.tl,lineHeight:1.6,borderTop:"1px solid #F0F0F0",paddingTop:8}}>{t.detail}</div>}
+    </div>);};
+    var renderSection=function(tasks,icon,label){if(!tasks.length)return null;var secDone=tasks.filter(function(t){return doneTasks[t.id];}).length;var allDone=secDone===tasks.length;return(<div style={{marginTop:16}}><div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:12,background:allDone?"#E8F5E9":"#F5F0FA",marginBottom:8}}><span style={{fontSize:16}}>{icon}</span><span style={{fontSize:14,fontWeight:700,flex:1,color:allDone?C.g:C.tx}}>{label}</span><span style={{fontSize:12,fontWeight:600,color:allDone?C.g:C.tl}}>{secDone+"/"+tasks.length+(allDone?" ✓":"")}</span></div>{tasks.map(renderTask)}</div>);};
+    return(<Frame>
+    <Hdr title="My Goals" sub="Tasks, goals & progress"/>
+    <div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>
+      {/* Daily Check-in */}
+      <div style={{fontSize:16,fontWeight:800,marginBottom:8}}>{"📋 Daily Check-in"}</div>
+      <div style={{fontSize:11,color:C.tl,marginBottom:12}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</div>
+      {outcomes.map(function(o){
+        var todayStr=todayKey();
+        var ga=goalAssessments[o.id];
+        var existing=ga&&ga.daily?ga.daily.find(function(d){return d.date===todayStr;}):null;
+        var rating=dailyRatings[o.id]||(existing?existing.rating:0);
+        var faces=[{v:1,f:"😢"},{v:2,f:"😟"},{v:3,f:"😐"},{v:4,f:"🙂"},{v:5,f:"😊"}];
+        var faceColors={1:C.r,2:C.a,3:"#FFD54F",4:"#81C784",5:C.g};
+        return(<Cd key={o.id} style={{padding:12,marginBottom:6}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>{o.text}</div>
+          <div style={{display:"flex",gap:6}}>
+            {faces.map(function(fc){var sel=rating===fc.v;return(
+              <div key={fc.v} onClick={function(){setDailyRatings(function(p){var n={...p};n[o.id]=fc.v;return n;});}} style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",background:sel?faceColors[fc.v]:"transparent",border:sel?"none":"2px solid #E0E0E0"}}>{fc.f}</div>
+            );})}
+          </div>
+        </Cd>);
+      })}
+      {outcomes.length>0&&(function(){
+        var allRated=outcomes.every(function(o){return dailyRatings[o.id]>0;});
+        var todayStr=todayKey();
+        var allDoneToday=outcomes.every(function(o){var ga=goalAssessments[o.id];return ga&&ga.daily&&ga.daily.some(function(d){return d.date===todayStr;});});
+        if(allDoneToday)return(<Cd style={{textAlign:"center",padding:12,background:"#E8F5E9",border:"2px solid "+C.g}}><div style={{fontSize:13,color:C.g,fontWeight:600}}>{"✅ Today's check-in complete"}</div></Cd>);
+        return(<Btn onClick={function(){
+          var todayStr2=todayKey();
+          setGoalAssessments(function(p){
+            var n={...p};
+            outcomes.forEach(function(o){
+              if(dailyRatings[o.id]){
+                if(!n[o.id])n[o.id]={daily:[],weekly:[]};
+                var existing=n[o.id].daily.findIndex(function(d){return d.date===todayStr2;});
+                if(existing>=0)n[o.id].daily[existing].rating=dailyRatings[o.id];
+                else n[o.id].daily.push({date:todayStr2,rating:dailyRatings[o.id]});
+              }
+            });
+            return n;
+          });
+          var alreadyLogged=sessionHistory.some(function(s){return s.date===todayKey();});
+          if(!alreadyLogged){
+            setSessionHistory(function(p){return[...p,{pain:pain,diff:"ok",date:todayKey()}];});
+            setStreak(function(s){return s+1;});
+          }
+          setDoneTasks(function(p){var o={...p};o["dt_review"]=true;return o;});
+        }} disabled={!allRated}>{allRated?"Save Check-in":"Rate all goals to save"}</Btn>);
+      })()}
+
+      {/* Weekly Review nudge on Goals screen */}
+      {(function(){var lastWeekly=null;Object.values(goalAssessments).forEach(function(ga2){if(ga2.weekly&&ga2.weekly.length>0){var last=ga2.weekly[ga2.weekly.length-1];if(!lastWeekly||last.weekStart>lastWeekly)lastWeekly=last.weekStart;}});var showWeekly=!lastWeekly||(new Date().getTime()-new Date(lastWeekly).getTime())/(1000*60*60*24)>=7;if(showWeekly)return(<Cd onClick={function(){}} style={{background:"#FFF8E1",border:"2px solid "+C.a,marginTop:12}}><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:18}}>{"📊"}</span><div><div style={{fontSize:14,fontWeight:700,color:C.a}}>End of week — reflect on your goals</div><div style={{fontSize:11,color:C.tl}}>Adjust the confidence sliders below</div></div></div></Cd>);return null;})()}
+
+      {/* SECTION A: Daily Tasks */}
+      <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>{"\u{1F4CB} Today's Tasks"}</div>
+      <Cd style={{padding:12}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:600,color:C.tl}}><span>{tasksDone+"/"+dailyTasks.length+" completed"}</span></div><PB v={tasksDone} mx={dailyTasks.length||1} c={C.g}/></Cd>
+      {renderSection(morningTasks,"\u{1F305}","Morning")}
+      {renderSection(afternoonTasks,"☀️","Afternoon")}
+      {renderSection(eveningTasks,"\u{1F319}","Evening")}
+      {dailyTasks.length===0&&<Cd style={{textAlign:"center",padding:24}}><div style={{fontSize:13,color:C.tl}}>Set your goals to see personalised daily tasks.</div></Cd>}
+
+      {/* SECTION B: Goals & Outcomes */}
+      <div style={{fontSize:16,fontWeight:800,marginTop:20,marginBottom:8}}>{"\u{1F3AF} My Recovery Goals"}</div>
+      {outcomes.length>0?outcomes.map(function(o){var st3=achieved[o.id]||"not_started";var dn=st3==="achieved";return(<div key={o.id} style={{display:"flex",alignItems:"center",gap:10,padding:14,borderRadius:14,border:"2px solid "+(dn?C.g:st3==="working"?C.a:"#E8E0ED"),background:dn?"#E8F5E9":st3==="working"?C.al:C.w,marginBottom:8}}>
+        <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,textDecoration:dn?"line-through":"none"}}>{o.text}</div><div style={{fontSize:11,color:C.tl,marginBottom:6}}>{o.cat}</div><div style={{display:"flex",gap:4,marginBottom:6}}>{[{s:"not_started",l:"Not started",c:"#CCC"},{s:"working",l:"Working on it",c:C.a},{s:"achieved",l:"Achieved",c:C.g}].map(function(opt){var active=st3===opt.s;return(<div key={opt.s} onClick={function(e){e.stopPropagation();setAchieved(function(p){var o2={...p};o2[o.id]=opt.s;return o2;});}} style={{padding:"4px 8px",borderRadius:10,fontSize:10,fontWeight:600,cursor:"pointer",background:active?opt.c:"transparent",color:active?C.w:C.tl,border:"1px solid "+(active?opt.c:"#E0E0E0")}}>{opt.l}</div>);})}</div>{(function(){var ga=goalAssessments[o.id];var faceChars=["","😢","😟","😐","🙂","😊"];var dayNames=["S","M","T","W","T","F","S"];var last7=[];for(var d3=6;d3>=0;d3--){var dt3=new Date();dt3.setDate(dt3.getDate()-d3);var k3=dt3.getFullYear()+"-"+(dt3.getMonth()+1)+"-"+dt3.getDate();var entry=ga&&ga.daily?ga.daily.find(function(dd){return dd.date===k3;}):null;last7.push({day:dayNames[dt3.getDay()],entry:entry});}var hasData=last7.some(function(d3){return d3.entry;});if(!hasData)return null;var lastWk=ga&&ga.weekly&&ga.weekly.length>0?ga.weekly[ga.weekly.length-1]:null;var wkDue=!lastWk||(new Date().getTime()-new Date(lastWk.weekStart).getTime())/(1000*60*60*24)>=7;var dailyAvg=0;var dailyCount=0;last7.forEach(function(d3){if(d3.entry){dailyAvg+=d3.entry.rating;dailyCount++;}});var calcConf=dailyCount>0?Math.round((dailyAvg/dailyCount-1)*2.5):5;var curConf=weeklyConf[o.id]!==undefined?weeklyConf[o.id]:(lastWk?lastWk.confidence:calcConf);return(<div style={{marginTop:4}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>{last7.map(function(d3,i3){return(<div key={i3} style={{textAlign:"center"}}><div style={{width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,margin:"0 auto",background:d3.entry?({1:C.r,2:C.a,3:"#FFD54F",4:"#81C784",5:C.g})[d3.entry.rating]||"#E0E0E0":"transparent",border:d3.entry?"none":"1.5px solid #E0E0E0"}}>{d3.entry?faceChars[d3.entry.rating]:""}</div><div style={{fontSize:8,color:C.tl,marginTop:1}}>{d3.day}</div></div>);})}</div>{wkDue?<div style={{marginTop:6}}><div style={{fontSize:11,fontWeight:600,marginBottom:4}}>Weekly confidence</div><div style={{display:"flex",justifyContent:"space-between",gap:1}}>{[0,1,2,3,4,5,6,7,8,9,10].map(function(n){var sel=(weeklyConf[o.id]!==undefined?weeklyConf[o.id]:calcConf)===n;return(<div key={n} onClick={function(e){e.stopPropagation();setWeeklyConf(function(p){var n2={...p};n2[o.id]=n;return n2;});}} style={{flex:1,height:24,borderRadius:4,background:sel?sCol(n):"#F0F0F0",color:sel?C.w:C.tx,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,cursor:"pointer"}}>{n}</div>);})}</div><div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:8,color:C.r}}>Not confident</span><span style={{fontSize:8,color:C.g}}>Very confident</span></div></div>:<div style={{marginTop:4,fontSize:10,color:C.tl}}>{"Last week: "+(lastWk?lastWk.confidence:"-")+"/10"}</div>}</div>);})()}</div>
+      </div>);}):
+      <Cd style={{textAlign:"center",padding:20}}><div style={{fontSize:13,color:C.tl,marginBottom:10}}>No goals set yet. Set your recovery goals to get personalised daily tasks.</div><Btn onClick={function(){goTop("manageOut");}}>Set Goals</Btn></Cd>}
+      {(function(){var anyDue=false;var allReviewed=outcomes.length>0;outcomes.forEach(function(o){var ga=goalAssessments[o.id];var lastWk=ga&&ga.weekly&&ga.weekly.length>0?ga.weekly[ga.weekly.length-1]:null;var wkDue=!lastWk||(new Date().getTime()-new Date(lastWk.weekStart).getTime())/(1000*60*60*24)>=7;if(wkDue)anyDue=true;if(wkDue)allReviewed=false;});if(anyDue)return(<Btn onClick={function(){var saved=false;setGoalAssessments(function(p){var n={...p};outcomes.forEach(function(o){var ga=n[o.id];var lastWk=ga&&ga.weekly&&ga.weekly.length>0?ga.weekly[ga.weekly.length-1]:null;var wkDue2=!lastWk||(new Date().getTime()-new Date(lastWk.weekStart).getTime())/(1000*60*60*24)>=7;if(wkDue2){if(!n[o.id])n[o.id]={daily:[],weekly:[]};var dailyAvg2=0,dc2=0;var last72=ga&&ga.daily?ga.daily.slice(-7):[];last72.forEach(function(d4){dailyAvg2+=d4.rating;dc2++;});var calc2=dc2>0?Math.round((dailyAvg2/dc2-1)*2.5):5;var val=weeklyConf[o.id]!==undefined?weeklyConf[o.id]:calc2;n[o.id].weekly.push({weekStart:todayKey(),confidence:val,adjusted:weeklyConf[o.id]!==undefined});}});saved=true;return n;});if(saved)setWeeklyConf({});}}>Save Weekly Reflection</Btn>);if(allReviewed&&outcomes.length>0)return(<Cd style={{textAlign:"center",padding:14,background:"#E8F5E9",border:"2px solid "+C.g}}><div style={{fontSize:13,fontWeight:600,color:C.g}}>{"✅ Weekly review complete — great reflection!"}</div></Cd>);return null;})()}
+      <Btn onClick={function(){goTop("manageOut");}} secondary>Manage Goals</Btn>
+
+      {/* SECTION C: Document Outcomes */}
+      {uploadedDocs.filter(function(d){return !d.error;}).length>0&&<div>
+      <div style={{fontSize:16,fontWeight:800,marginTop:20,marginBottom:8}}>{"\u{1F4C4} From Your Documents"}</div>
+      {uploadedDocs.filter(function(d){return !d.error;}).map(function(doc,i){return(<Cd key={i}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><div style={{fontSize:13,fontWeight:700,color:C.p}}>{doc.type||"Document"}</div><div style={{fontSize:11,color:C.tl}}>{doc.date||""}</div></div>
+        {doc.summary&&<div style={{fontSize:12,color:C.tx,lineHeight:1.6,marginBottom:6}}>{doc.summary}</div>}
+        {doc.keyPoints&&doc.keyPoints.length>0&&<div>{doc.keyPoints.map(function(kp,j){return(<div key={j} style={{fontSize:12,color:C.tl,padding:"2px 0",lineHeight:1.5}}>{"• "+(typeof kp==="string"?kp:(kp.category?kp.category+": ":"")+kp.detail)}</div>);})}</div>}
+      </Cd>);})}</div>}
+
+    </div>
+    <Nav active="goals" onNav={handleNav} coachName={coachName}/>
+  </Frame>);}
+
+  /* ═══ WEEKLY REVIEW ═══ */
+  if(scr==="weeklyReview"){return(<Frame><Hdr title="Weekly Review" sub={st?"Week "+Math.min(week,maxW):"Your recovery"} back={function(){go("goals");}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>
+    <Cd style={{background:C.pp,textAlign:"center"}}><div style={{fontSize:14,fontWeight:700,color:C.p}}>{"📊 Reflect on your week"}</div></Cd>
+    {outcomes.map(function(o){
+      var ga=goalAssessments[o.id];
+      var conf=weeklyConf[o.id]||5;
+      var last7=[];for(var d2=6;d2>=0;d2--){var dt=new Date();dt.setDate(dt.getDate()-d2);var key2=dt.getFullYear()+"-"+(dt.getMonth()+1)+"-"+dt.getDate();var dayNames=["S","M","T","W","T","F","S"];var entry=ga&&ga.daily?ga.daily.find(function(dd){return dd.date===key2;}):null;last7.push({day:dayNames[dt.getDay()],entry:entry});}
+      var faces=["","😢","😟","😐","🙂","😊"];
+      return(<Cd key={o.id}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:8}}>{o.text}</div>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+          {last7.map(function(d2,i2){return(<div key={i2} style={{textAlign:"center"}}>
+            <div style={{width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",fontSize:12,background:d2.entry?sCol(d2.entry.rating*2):"transparent",border:d2.entry?"none":"2px solid #E0E0E0"}}>{d2.entry?faces[d2.entry.rating]:""}</div>
+            <div style={{fontSize:9,color:C.tl,marginTop:2}}>{d2.day}</div>
+          </div>);})}
+        </div>
+        <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>How confident do you feel about this?</div>
+        <div style={{display:"flex",justifyContent:"space-between",gap:2}}>
+          {[0,1,2,3,4,5,6,7,8,9,10].map(function(n){return(<div key={n} onClick={function(){setWeeklyConf(function(p){var o2={...p};o2[o.id]=n;return o2;});}} style={{flex:1,height:28,borderRadius:6,background:conf===n?sCol(n):"#F0F0F0",color:conf===n?C.w:C.tx,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,cursor:"pointer"}}>{n}</div>);})}
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:C.r}}>Not confident</span><span style={{fontSize:9,color:C.g}}>Very confident</span></div>
+      </Cd>);
+    })}
+    <Cd><div style={{fontSize:13,fontWeight:600,marginBottom:6}}>What went well this week?</div>
+      <textarea value={weeklyNote} onChange={function(e){setWeeklyNote(e.target.value);}} placeholder="Even small wins count..." rows={3} style={{width:"100%",padding:"12px",borderRadius:12,border:"2px solid #E8E0ED",fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"inherit",resize:"none"}}/></Cd>
+    {wrSaved?<Cd style={{textAlign:"center",padding:20,position:"relative",overflow:"hidden"}}><div style={{fontSize:15,fontWeight:700,color:C.g}}>{"\u2705 Review Saved"}</div><div style={{position:"absolute",top:0,left:0,right:0,bottom:0,display:"flex",alignItems:"center",justifyContent:"space-around",pointerEvents:"none"}}>{["\u{1F389}","\u2B50","\u2728","\u{1F31F}","\u{1F389}"].map(function(e,i){return(<span key={i} style={{fontSize:20,opacity:0,animation:"fadeOut 1.5s ease-out",animationFillMode:"forwards",animationDelay:i*0.1+"s"}}>{e}</span>);})}<style>{"@keyframes fadeOut{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-20px)}}"}</style></div></Cd>:<Btn onClick={function(){setGoalAssessments(function(p){var n={...p};outcomes.forEach(function(o){if(!n[o.id])n[o.id]={daily:[],weekly:[]};n[o.id].weekly.push({weekStart:todayKey(),confidence:weeklyConf[o.id]||5});});return n;});if(weeklyNote.trim())setSessionHistory(function(p){return[...p,{date:todayKey(),type:"weekly",note:weeklyNote}];});setWeeklyNote("");setWrSaved(true);setTimeout(function(){setWrSaved(false);goTop("goals");},1500);}}>Complete Review</Btn>}
+  </div></Frame>);}
+
+  /* ═══ SUPPORT PLAN — INSTANT, FULLY PERSONALISED, NO API ═══ */
+  if(scr==="equip"){
+    if(!uid)return(<Frame><Hdr title="My Recovery Tools"/><div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,textAlign:"center"}}><div style={{fontSize:44,marginBottom:16}}>{"\u{1F6E0}\uFE0F"}</div><div style={{fontSize:22,fontWeight:800,marginBottom:8}}>Equipment list coming soon</div><div style={{fontSize:13,color:C.tl,lineHeight:1.6,marginBottom:20,maxWidth:260}}>Complete your setup to see personalised equipment recommendations for your recovery.</div><Btn onClick={function(){goTop("welcome");}}>Get Started</Btn></div><Nav active="equip" onNav={handleNav} coachName={coachName}/></Frame>);
+    return(<Frame><Hdr title="My Recovery Tools" sub="Equipment & room safety"/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>
+
+      {/* Core equipment */}
+      {eqPlan.equipment&&eqPlan.equipment.length>0&&<div>
+        <div style={{fontSize:16,fontWeight:800,marginBottom:10}}>{"\u{1F6E0}\uFE0F Your Equipment List"}</div>
+        {eqPlan.equipment.map(function(e2,i2){var item=typeof e2==="string"?{name:e2}:e2;var nm=item.name||"";var isRoom=nm.indexOf("\u{1F534}")===0||nm.indexOf("\u{1F7E0}")===0||nm.indexOf("\u{1F7E2}")===0;var isDoc=nm.indexOf("\u{1F4C4}")===0;var bgCol=isRoom?"#FAFAFA":isDoc?"#F3E8FA":"transparent";var borderCol=nm.indexOf("\u{1F534}")===0?C.r:nm.indexOf("\u{1F7E0}")===0?C.a:nm.indexOf("\u{1F7E2}")===0?C.g:C.pl;return(<div key={i2} style={{padding:"10px 12px",lineHeight:1.5,background:bgCol,borderRadius:12,marginBottom:4,borderLeft:"4px solid "+borderCol}}>
+          <div style={{fontSize:13,color:C.tx}}>{nm}{isRoom&&<span style={{fontSize:10,color:C.tl,marginLeft:6}}>from room scan</span>}{isDoc&&<span style={{fontSize:10,color:C.p,marginLeft:6}}>from your documents</span>}</div>
+          {item.link&&<div style={{marginTop:4}}><a href={item.link} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:C.p,fontWeight:600,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4,background:C.pp,padding:"4px 10px",borderRadius:8}}>{item.src==="NHS (prescribed)"?"\u{1F3E5} NHS Info":"\u{1F6D2} View & Buy"}<span style={{fontSize:10}}>{"\u2197"}</span></a></div>}
+        </div>);})}
+        {eqPlan.scannedRooms&&<div style={{fontSize:11,color:C.p,marginTop:6,fontWeight:600}}>{"Rooms assessed: "+eqPlan.scannedRooms.join(", ")}</div>}
+      </div>}
+
+      {/* Home Safety Assessment */}
+      {eqPlan.roomAssessment&&<div style={{marginTop:16}}>
+        <div style={{fontSize:16,fontWeight:800,marginBottom:10}}>{"\u{1F3E0} Home Safety Assessment"}</div>
+        <Cd style={{background:C.pp}}>
+          <div style={{fontSize:13,color:C.tl,marginBottom:10}}>{eqPlan.roomAssessment.totalActions+" action"+(eqPlan.roomAssessment.totalActions!==1?"s":"")+" identified across "+eqPlan.roomAssessment.rooms.length+" room"+(eqPlan.roomAssessment.rooms.length!==1?"s":"")}</div>
+          {eqPlan.roomAssessment.rooms.map(function(rm,i2){return(<div key={i2} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid rgba(107,45,139,.1)"}}><span style={{fontSize:18}}>{(ROOM_CHECKS[rm.room]||{}).ic||"\u{1F3E0}"}</span><span style={{flex:1,fontSize:13,fontWeight:600}}>{rm.room}</span><div style={{display:"flex",gap:4}}>{rm.essential>0&&<span style={{fontSize:10,fontWeight:700,color:C.r,background:C.rl,borderRadius:10,padding:"3px 8px"}}>{rm.essential+" essential"}</span>}{rm.recommended>0&&<span style={{fontSize:10,fontWeight:700,color:C.a,background:C.al,borderRadius:10,padding:"3px 8px"}}>{rm.recommended+" rec."}</span>}{rm.essential===0&&rm.recommended===0&&<span style={{fontSize:10,fontWeight:700,color:C.g,background:"#E8F5E9",borderRadius:10,padding:"3px 8px"}}>{"\u2713 OK"}</span>}</div></div>);})}
+        </Cd>
+        {eqPlan.roomAssessment.safetyIssues.length>0&&<Cd style={{background:C.rl,border:"1px solid "+C.r}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.r,marginBottom:6}}>{"\u26A0\uFE0F Safety Issues"}</div>
+          {eqPlan.roomAssessment.safetyIssues.map(function(s,i2){return(<div key={i2} style={{fontSize:12,color:C.r,padding:"2px 0",lineHeight:1.5}}>{"\u2022 "+s}</div>);})}
+        </Cd>}
+        {eqPlan.roomAssessment.essentialMissing.length>0&&<Cd>
+          <div style={{fontSize:14,fontWeight:700,color:C.r,marginBottom:6}}>{"\u{1F534} Essential — Get these first"}</div>
+          {eqPlan.roomAssessment.essentialMissing.map(function(s,i2){return(<div key={i2} style={{fontSize:12,color:C.tx,padding:"3px 0",lineHeight:1.5}}>{"\u2022 "+s}</div>);})}
+        </Cd>}
+        {eqPlan.roomAssessment.recommendedMissing.length>0&&<Cd>
+          <div style={{fontSize:14,fontWeight:700,color:C.a,marginBottom:6}}>{"\u{1F7E0} Recommended"}</div>
+          {eqPlan.roomAssessment.recommendedMissing.map(function(s,i2){return(<div key={i2} style={{fontSize:12,color:C.tx,padding:"3px 0",lineHeight:1.5}}>{"\u2022 "+s}</div>);})}
+        </Cd>}
+      </div>}
+
+      {/* No room data yet */}
+      {!eqPlan.roomAssessment&&<Cd style={{background:C.pp,textAlign:"center",padding:24}}>
+        <div style={{fontSize:36,marginBottom:10}}>{"\u{1F4F8}"}</div>
+        <div style={{fontSize:14,fontWeight:700,color:C.p,marginBottom:6}}>No rooms assessed yet</div>
+        <div style={{fontSize:12,color:C.tl,lineHeight:1.5}}>Upload photos of your rooms to get personalised equipment and safety recommendations.</div>
+      </Cd>}
+
+      {/* Condition-specific note */}
+      {eqPlan.conditionNotes&&<Cd><div style={{fontSize:14,fontWeight:700,marginBottom:6}}>{"\u{1F3E5} Condition-Specific Equipment"}</div>{eqPlan.conditionNotes.map(function(cn,i2){return(<div key={i2} style={{fontSize:12,color:C.tl,padding:"2px 0"}}>{"\u2022 Items adapted for: "+cn}</div>);})}</Cd>}
+
+    </div><Nav active="equip" onNav={handleNav} coachName={coachName}/></Frame>);
+  }
+
+  /* ═══ MORE MENU ═══ */
+  if(scr==="more")return(<Frame><Hdr title="More"/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>{[{id:"docs",ic:"\u{1F4C4}",lb:"My Documents",sub:"Hospital documents & paperwork"},{id:"help",ic:"\u{1F4AC}",lb:"Support & Coach",sub:"Emergency contacts, AI coach & resources"},{id:"settings",ic:"\u2699\uFE0F",lb:"Settings",sub:"Profile & preferences"}].map(function(t){return(<Cd key={t.id} onClick={function(){goTop(t.id);}} style={{padding:14,cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:14}}><span style={{fontSize:22}}>{t.ic}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700}}>{t.lb}</div><div style={{fontSize:12,color:C.tl,marginTop:2}}>{t.sub}</div></div><span style={{color:"#CCC",fontSize:16}}>{"\u203A"}</span></div></Cd>);})}</div><Nav active="more" onNav={handleNav} coachName={coachName}/></Frame>);
+
+  /* ═══ DOCS ═══ */
+  if(scr==="docs")return(<Frame><Hdr title="My Documents" sub="Scans, letters & paperwork"/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>
+    {/* SECTION A: Room Scanner */}
+    <div style={{fontSize:16,fontWeight:800,marginBottom:8}}>{"\u{1F4F7} Room Safety Scanner"}</div>
+    <Cd style={{background:C.pp}}><div style={{fontSize:12,color:C.p,lineHeight:1.5,fontWeight:600}}>Upload a photo of any room and we'll suggest safety improvements and equipment for your recovery.</div></Cd>
+    <Scanner surg={st} onDone={function(r2,res2){setEquipAids(function(p){return[...p.filter(function(e){return e.room!==r2;}),{room:r2,results:res2}];});setSupportPlan(null);}}/>
+    {equipAids.length>0&&<Cd style={{marginTop:8}}><div style={{fontSize:13,fontWeight:700,color:C.g,marginBottom:4}}>{"\u2713 "+equipAids.length+" room"+(equipAids.length!==1?"s":"")+" scanned"}</div><div style={{fontSize:11,color:C.tl}}>View results on your Equipment screen</div></Cd>}
+    {/* SECTION B: Hospital Documents */}
+    <div style={{fontSize:16,fontWeight:800,marginTop:20,marginBottom:8}}>{"\u{1F4CB} Hospital Documents"}</div>
+    <input ref={filePickRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={function(e){handleFileUpload(e,docUpType);}}/>
+    <input ref={camPickRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={function(e){handleFileUpload(e,docUpType);}}/>
+    {docJustUploaded&&<Cd style={{background:"linear-gradient(135deg,"+C.g+",#66BB6A)",border:"none"}}><div style={{display:"flex",gap:10,alignItems:"center"}}><div style={{width:40,height:40,borderRadius:"50%",background:"rgba(255,255,255,.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{"\u2713"}</div><div style={{flex:1,color:C.w}}><div style={{fontSize:14,fontWeight:700}}>Document processed!</div><div style={{fontSize:12,opacity:.9,marginTop:2}}>Your recovery guide will update automatically.</div></div></div><button onClick={function(){setDocJustUploaded(false);setSupportPlan(null);}} style={{width:"100%",marginTop:10,background:"rgba(255,255,255,.25)",color:C.w,border:"2px solid rgba(255,255,255,.5)",borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Update Recovery Guide</button></Cd>}
+    {docProcessing&&<Cd style={{textAlign:"center",padding:24}}><div style={{fontSize:36,marginBottom:10,animation:"spin 1.5s linear infinite"}}><style>{"@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}"}</style>{"\u{1F4C4}"}</div><div style={{fontSize:15,fontWeight:700}}>Reading your document...</div><div style={{fontSize:12,color:C.tl,marginTop:4}}>Reading medications, dates, and key details</div></Cd>}
+    {[{type:"Discharge summary",ic:"\u{1F3E5}",desc:"Your hospital discharge letter"},{type:"Hospital paperwork",ic:"\u{1F4CB}",desc:"Any other hospital documents"}].map(function(dt){return(<Cd key={dt.type} style={{padding:16}}>
+      <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:12}}><span style={{fontSize:24}}>{dt.ic}</span><div><div style={{fontSize:14,fontWeight:700}}>{dt.type}</div><div style={{fontSize:12,color:C.tl}}>{dt.desc}</div></div></div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={function(){setDocUpType(dt.type);setTimeout(function(){if(filePickRef.current)filePickRef.current.click();},50);}} style={{flex:1,padding:12,borderRadius:12,border:"2px solid "+C.p,background:C.w,color:C.p,fontSize:13,fontWeight:600,cursor:"pointer"}}>Upload</button>
+        <button onClick={function(){setDocUpType(dt.type);setTimeout(function(){if(camPickRef.current)camPickRef.current.click();},50);}} style={{flex:1,padding:12,borderRadius:12,border:"none",background:C.p,color:C.w,fontSize:13,fontWeight:600,cursor:"pointer"}}>Scan</button>
+      </div>
+    </Cd>);})}
+    {uploadedDocs.length>0&&<div><div style={{fontSize:14,fontWeight:700,marginTop:8,marginBottom:10}}>Uploaded Documents</div>
+      {uploadedDocs.map(function(doc){return(<Cd key={doc.id} style={{borderLeft:"4px solid "+(doc.error?C.r:C.g)}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:14,fontWeight:700}}>{doc.type}</div><span style={{fontSize:10,color:C.tl}}>{doc.uploadDate}</span></div>
+        {doc.summary&&<div style={{fontSize:13,color:C.tl,lineHeight:1.5,marginTop:4}}>{doc.summary}</div>}
+        {doc.medications&&doc.medications.length>0&&<div style={{marginTop:8,background:"#F3E8FA",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:11,fontWeight:700,color:C.p,marginBottom:3}}>{"\u{1F48A} Medications"}</div>{doc.medications.map(function(m,mi){var txt=typeof m==="string"?m:m&&typeof m==="object"?Object.values(m).filter(function(v){return typeof v==="string";}).join(" \u2014 "):"";return(<div key={mi} style={{fontSize:11,color:C.tx,lineHeight:1.4}}>{"\u2022 "+txt}</div>);})}</div>}
+        {doc.followUp&&doc.followUp.length>0&&<div style={{marginTop:6,background:"#E3F2FD",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:11,fontWeight:700,color:"#1565C0",marginBottom:3}}>{"\u{1F4C5} Follow-up"}</div>{doc.followUp.map(function(fu,fi){var txt=typeof fu==="string"?fu:fu&&typeof fu==="object"?Object.values(fu).filter(function(v){return typeof v==="string";}).join(" \u2014 "):"";return(<div key={fi} style={{fontSize:11,color:C.tx,lineHeight:1.4}}>{"\u2022 "+txt}</div>);})}</div>}
+        {doc.keyPoints&&doc.keyPoints.length>0&&!doc.medications&&<div style={{marginTop:6}}>{doc.keyPoints.map(function(kp,ki){return(<div key={ki} style={{fontSize:11,color:C.tl,lineHeight:1.4,padding:"1px 0"}}><span style={{fontWeight:600}}>{kp.category}:</span> {kp.detail}</div>);})}</div>}
+        <div onClick={function(){setUploadedDocs(function(p){return p.filter(function(d){return d.id!==doc.id;});});}} style={{fontSize:12,color:C.r,cursor:"pointer",marginTop:8,textAlign:"right"}}>Remove</div>
+      </Cd>);})}
+    </div>}
+    {uploadedDocs.length===0&&<div style={{fontSize:12,color:C.tl,textAlign:"center",marginTop:8}}>Upload your discharge letters or hospital paperwork to keep everything in one place.</div>}
+  </div><Nav active="more" onNav={handleNav} coachName={coachName}/></Frame>);
+
+  /* ═══ HELP ═══ */
+  if(scr==="coach")return(<Frame><Hdr title={coachName} sub="Your recovery coach"/><div style={{flex:1,display:"flex",flexDirection:"column"}}>
+    <div ref={chatRef} style={{flex:1,overflow:"auto",padding:"10px 14px"}}>{msgs.map(function(m,i2){return(<div key={i2} style={{display:"flex",justifyContent:m.f==="u"?"flex-end":"flex-start",marginBottom:8}}><div style={{maxWidth:"80%",padding:"10px 14px",borderRadius:m.f==="u"?"16px 16px 4px 16px":"16px 16px 16px 4px",background:m.f==="u"?C.p:"#F0ECF5",color:m.f==="u"?C.w:C.tx,fontSize:13,lineHeight:1.5}}>{m.t}</div></div>);})}{chatLoading&&<div style={{display:"flex",justifyContent:"flex-start",marginBottom:8}}><div style={{padding:"10px 14px",borderRadius:"16px 16px 16px 4px",background:"#F0ECF5",color:C.tl,fontSize:13}}>{coachName+" is typing..."}</div></div>}</div>
+    <div style={{borderTop:"1px solid #E8E0ED",padding:"10px 14px",display:"flex",gap:8,flexShrink:0}}><input value={chatVal} onChange={function(e){setChatVal(e.target.value);}} onClick={function(e){e.stopPropagation();}} onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();sendChat();}}} placeholder={chatLoading?coachName+" is thinking...":"Ask about your recovery..."} style={{flex:1,padding:"10px 14px",borderRadius:24,border:"2px solid #E8E0ED",fontSize:14,outline:"none",opacity:chatLoading?0.5:1}} disabled={chatLoading}/><button onClick={chatLoading?undefined:sendChat} aria-label="Send message" style={{width:40,height:40,borderRadius:"50%",background:chatVal.trim()&&!chatLoading?C.p:"#E8E0ED",color:C.w,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:chatVal.trim()&&!chatLoading?"pointer":"default",border:"none",padding:0}}>{"\u2191"}</button></div>
+  </div><Nav active="coach" onNav={handleNav} coachName={coachName}/></Frame>);
+  if(scr==="help"){
+    if(selRes){var r2=RES.find(function(x){return x.id===selRes;});return(<Frame><Hdr title={r2?r2.t:""} back={function(){setSelRes(null);}}/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}><Cd><div style={{fontSize:14,lineHeight:1.6}}>{r2?r2.d:""}</div></Cd></div><Nav active="more" onNav={handleNav} coachName={coachName}/></Frame>);}
+    return(<Frame><Hdr title="Support"/><div ref={scrollRef} style={{flex:1,overflow:"auto",padding:"14px 18px 20px"}}>
+      <Cd style={{background:C.pp,border:"2px solid "+C.pl}}><div style={{fontSize:13,lineHeight:1.6}}>{"\u{1F3E5} If you have any medical concerns about your recovery, contact your GP, call NHS 111, or in an emergency call 999."}</div></Cd>
+      <Cd onClick={function(){go("coach");}} style={{background:C.pp,border:"2px solid "+C.pl,cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}><div style={{width:38,height:38,borderRadius:"50%",background:C.p,color:C.w,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700}}>{coachName.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.p}}>{"Chat with "+coachName}</div><div style={{fontSize:11,color:C.tl}}>Your recovery coach</div></div><span style={{color:C.pl,fontSize:18}}>{"\u203A"}</span></div></Cd>
+      <div style={{fontSize:15,fontWeight:700,marginTop:14,marginBottom:10}}>Resources</div>
+      {RES.map(function(r3){return(<Cd key={r3.id} onClick={function(){setSelRes(r3.id);}} style={{padding:12}}><div style={{display:"flex",gap:10,alignItems:"center"}}><span style={{fontSize:20}}>{r3.i}</span><div style={{flex:1,fontSize:13,fontWeight:600}}>{r3.t}</div><span style={{color:"#CCC"}}>{"\u203A"}</span></div></Cd>);})}
+    </div><Nav active="more" onNav={handleNav} coachName={coachName}/></Frame>);}
+
+  /* ═══ PLAN UPDATED OVERLAY ═══ */
+  
+  return(<Frame><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><Btn onClick={function(){go("home");}}>Dashboard</Btn></div></Frame>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
